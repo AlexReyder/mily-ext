@@ -186,12 +186,12 @@ export function LibraryPage() {
               />
             ) : (
                 <BookmarksGrid
-            data={filteredData}
-            rowSelection={rowSelection}
-            onRowSelectionChange={setRowSelection}
-            onEdit={(bookmark) => setEditingBookmark(bookmark)}
-            isBulkDeleting={deleteSelectedMutation.isPending}
-          />
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                onEdit={(bookmark) => setEditingBookmark(bookmark)}
+                isBulkDeleting={deleteSelectedMutation.isPending}
+                />
             )}
           </>
         ) : null}
