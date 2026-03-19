@@ -1,0 +1,210 @@
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { RowSelectionState } from "@tanstack/react-table";
+
+import {
+  deleteBookmarksByIds,
+  getBookmarks,
+  updateBookmark,
+} from "@/features/bookmark/lib/bookmark.repository";
+import { EditBookmarkSheet } from "@/features/bookmark/ui/edit-bookmark-sheet";
+import type {
+  BookmarkRecord,
+  UpdateBookmarkInput,
+} from "@/features/bookmark/model/bookmark.types";
+import { useLibraryViewStore } from "../model/library-view.store";
+import { BookmarksTable } from "./bookmarks-table";
+import { LibraryToolbar } from "./library-toolbar";
+
+export function LibraryPage() {
+  const [search, setSearch] = useState("");
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [editingBookmark, setEditingBookmark] = useState<BookmarkRecord | null>(
+    null,
+  );
+
+  const viewMode = useLibraryViewStore((state) => state.viewMode);
+  const queryClient = useQueryClient();
+
+  const bookmarksQuery = useQuery({
+    queryKey: ["bookmarks"],
+    queryFn: getBookmarks,
+  });
+
+  const filteredData = useMemo(() => {
+    const items = bookmarksQuery.data ?? [];
+    const q = search.trim().toLowerCase();
+
+    if (!q) return items;
+
+    return items.filter((item) => {
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.url.toLowerCase().includes(q) ||
+        item.note.toLowerCase().includes(q) ||
+        item.collectionId.toLowerCase().includes(q) ||
+        item.tags.some((tag) => tag.toLowerCase().includes(q))
+      );
+    });
+  }, [bookmarksQuery.data, search]);
+
+  const selectedIds = useMemo(
+    () => Object.keys(rowSelection).filter((id) => rowSelection[id]),
+    [rowSelection],
+  );
+
+  useEffect(() => {
+    const existingIds = new Set((bookmarksQuery.data ?? []).map((item) => item.id));
+
+    setRowSelection((prev) => {
+      let changed = false;
+      const next: RowSelectionState = {};
+
+      for (const [id, selected] of Object.entries(prev)) {
+        if (selected && existingIds.has(id)) {
+          next[id] = true;
+        } else {
+          changed = true;
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [bookmarksQuery.data]);
+
+  const deleteSelectedMutation = useMutation({
+    mutationFn: deleteBookmarksByIds,
+    onSuccess: async (_, deletedIds) => {
+      setRowSelection((prev) => {
+        const next = { ...prev };
+
+        for (const id of deletedIds) {
+          delete next[id];
+        }
+
+        return next;
+      });
+
+      await queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+  });
+
+  const updateBookmarkMutation = useMutation({
+    mutationFn: ({
+      bookmarkId,
+      input,
+    }: {
+      bookmarkId: string;
+      input: UpdateBookmarkInput;
+    }) => updateBookmark(bookmarkId, input),
+    onSuccess: async () => {
+      setEditingBookmark(null);
+      await queryClient.invalidateQueries({ queryKey: ["bookmarks"] });
+    },
+  });
+
+  const handleSelectAllFiltered = () => {
+    if (!filteredData.length) return;
+
+    const nextEntries = Object.fromEntries(
+      filteredData.map((item) => [item.id, true]),
+    );
+
+    setRowSelection((prev) => ({
+      ...prev,
+      ...nextEntries,
+    }));
+  };
+
+  const handleClearSelection = () => {
+    setRowSelection({});
+  };
+
+  const handleBulkDelete = () => {
+    if (!selectedIds.length || deleteSelectedMutation.isPending) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Удалить выбранные bookmarks (${selectedIds.length})?`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteSelectedMutation.mutate(selectedIds);
+  };
+
+  return (
+    <div className="min-h-screen bg-muted/30">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Library</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Сохранённые bookmarks. Сейчас реализуем Table View, затем добавим Grid.
+          </p>
+        </div>
+
+        <LibraryToolbar
+          search={search}
+          onSearchChange={setSearch}
+          onRefresh={() => {
+            void bookmarksQuery.refetch();
+          }}
+          filteredCount={filteredData.length}
+          selectedCount={selectedIds.length}
+          onSelectAllFiltered={handleSelectAllFiltered}
+          onClearSelection={handleClearSelection}
+          onBulkDelete={handleBulkDelete}
+          isBulkDeleting={deleteSelectedMutation.isPending}
+          isRefreshing={bookmarksQuery.isFetching}
+        />
+
+        {bookmarksQuery.isLoading ? (
+          <div className="rounded-2xl border bg-background p-8 text-sm text-muted-foreground">
+            Загружаем bookmarks...
+          </div>
+        ) : null}
+
+        {bookmarksQuery.isError ? (
+          <div className="rounded-2xl border border-destructive/30 bg-background p-8 text-sm text-destructive">
+            Не удалось загрузить bookmarks.
+          </div>
+        ) : null}
+
+        {!bookmarksQuery.isLoading && !bookmarksQuery.isError ? (
+          <>
+            {viewMode === "table" ? (
+              <BookmarksTable
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                onEdit={(bookmark) => setEditingBookmark(bookmark)}
+                isBulkDeleting={deleteSelectedMutation.isPending}
+              />
+            ) : (
+              <div className="rounded-2xl border bg-background p-8 text-sm text-muted-foreground">
+                Grid View подключим следующим этапом.
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+
+      <EditBookmarkSheet
+        open={Boolean(editingBookmark)}
+        bookmark={editingBookmark}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingBookmark(null);
+          }
+        }}
+        onSave={(bookmarkId, input) => {
+          updateBookmarkMutation.mutate({ bookmarkId, input });
+        }}
+        isSaving={updateBookmarkMutation.isPending}
+      />
+    </div>
+  );
+}

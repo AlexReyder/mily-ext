@@ -1,0 +1,77 @@
+├── .tanstack
+│   └── tmp
+├── .wxt
+│   ├── types
+│   │   ├── globals.d.ts
+│   │   ├── i18n.d.ts
+│   │   ├── imports-module.d.ts
+│   │   ├── imports.d.ts
+│   │   └── paths.d.ts
+│   ├── tsconfig.json
+│   └── wxt.d.ts
+├── public
+│   ├── icon
+│   │   ├── 128.png
+│   │   ├── 16.png
+│   │   ├── 32.png
+│   │   ├── 48.png
+│   │   └── 96.png
+│   └── wxt.svg
+├── src
+│   ├── assets
+│   │   ├── react.svg
+│   │   └── tailwind.css
+│   ├── components
+│   │   └── ui
+│   │       └── button.tsx
+│   ├── entries
+│   │   ├── app
+│   │   │   ├── index.html
+│   │   │   └── main.tsx
+│   │   ├── popup
+│   │   │   ├── App.css
+│   │   │   ├── App.tsx
+│   │   │   ├── index.html
+│   │   │   ├── main.tsx
+│   │   │   └── style.css
+│   │   ├── background.ts
+│   │   └── content.ts
+│   ├── features
+│   │   ├── auth
+│   │   │   ├── model
+│   │   │   │   ├── auth.schemas.ts
+│   │   │   │   └── popup-auth.store.ts
+│   │   │   └── ui
+│   │   │       ├── auth-shell.tsx
+│   │   │       ├── email-auth-step.tsx
+│   │   │       └── otp-auth-step.tsx
+│   │   ├── bookmark
+│   │   │   ├── lib
+│   │   │   │   ├── bookmark.repository.ts
+│   │   │   │   └── get-active-tab-draft.ts
+│   │   │   ├── model
+│   │   │   │   ├── bookmark.types.ts
+│   │   │   │   └── create-bookmark.schema.ts
+│   │   │   └── ui
+│   │   │       └── create-bookmark-step.tsx
+│   │   └── library
+│   │       ├── model
+│   │       │   └── library-view.store.ts
+│   │       └── ui
+│   │           ├── bookmarks-table.tsx
+│   │           ├── library-page.tsx
+│   │           └── library-toolbar.tsx
+│   ├── hooks
+│   ├── lib
+│   │   ├── db.ts
+│   │   └── utils.ts
+│   ├── utils
+├── wxt-modules
+├── _gitignore
+├── components.json
+├── file_tree.txt
+├── package.json
+├── pnpm-lock.yaml
+├── README.md
+├── tsconfig.json
+└── wxt.config.ts
