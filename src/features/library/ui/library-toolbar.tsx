@@ -57,6 +57,15 @@ export function LibraryToolbar({
 
           <Button
             type="button"
+            variant={viewMode === "large-icons" ? "default" : "outline"}
+            onClick={() => setViewMode("large-icons")}
+          >
+            <LayoutGrid className="mr-2 size-4" />
+            Large Icons
+          </Button>
+
+          <Button
+            type="button"
             variant={viewMode === "grid" ? "default" : "outline"}
             onClick={() => setViewMode("grid")}
           >

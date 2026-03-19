@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { SortingState } from "@tanstack/react-table";
 
-export type LibraryViewMode = "table" | "grid";
+export type LibraryViewMode = "table" | "grid" | "large-icons";
 
 type LibraryViewState = {
   viewMode: LibraryViewMode;

@@ -16,6 +16,8 @@ import { useLibraryViewStore } from "../model/library-view.store";
 import { BookmarksTable } from "./bookmarks-table";
 import { LibraryToolbar } from "./library-toolbar";
 import { BookmarksGrid } from "./bookmarks-grid";
+import { BookmarksLargeIcons } from "./bookmarks-large-icons";
+
 
 export function LibraryPage() {
   const [search, setSearch] = useState("");
@@ -174,27 +176,33 @@ export function LibraryPage() {
           </div>
         ) : null}
 
-        {!bookmarksQuery.isLoading && !bookmarksQuery.isError ? (
-          <>
-            {viewMode === "table" ? (
-              <BookmarksTable
-                data={filteredData}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                onEdit={(bookmark) => setEditingBookmark(bookmark)}
-                isBulkDeleting={deleteSelectedMutation.isPending}
-              />
-            ) : (
-                <BookmarksGrid
-                data={filteredData}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                onEdit={(bookmark) => setEditingBookmark(bookmark)}
-                isBulkDeleting={deleteSelectedMutation.isPending}
-                />
-            )}
-          </>
-        ) : null}
+            {!bookmarksQuery.isLoading && !bookmarksQuery.isError ? (
+        <>
+          {viewMode === "table" ? (
+            <BookmarksTable
+              data={filteredData}
+              rowSelection={rowSelection}
+              onRowSelectionChange={setRowSelection}
+              onEdit={(bookmark) => setEditingBookmark(bookmark)}
+              isBulkDeleting={deleteSelectedMutation.isPending}
+            />
+          ) : viewMode === "grid" ? (
+            <BookmarksGrid
+              data={filteredData}
+              rowSelection={rowSelection}
+              onRowSelectionChange={setRowSelection}
+              onEdit={(bookmark) => setEditingBookmark(bookmark)}
+              isBulkDeleting={deleteSelectedMutation.isPending}
+            />
+          ) : (
+            <BookmarksLargeIcons
+              data={filteredData}
+              rowSelection={rowSelection}
+              onRowSelectionChange={setRowSelection}
+            />
+          )}
+        </>
+      ) : null}
       </div>
 
       <EditBookmarkSheet
