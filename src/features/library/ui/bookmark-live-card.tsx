@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Monitor, Smartphone, Tablet } from "lucide-react";
+import { ExternalLink, Monitor, Smartphone, Tablet } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
 
@@ -289,6 +290,42 @@ export function BookmarkLiveCard({
             </div>
           ) : null}
         </div>
+      </div>
+
+      <div className="flex items-start justify-between gap-3 border-t bg-background px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-medium">{bookmark.title}</div>
+
+          {bookmark.tags.length ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {bookmark.tags.slice(0, 4).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  {tag}
+                </span>
+              ))}
+              {bookmark.tags.length > 4 ? (
+                <span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
+                  +{bookmark.tags.length - 4}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        <Button asChild variant="outline" size="icon" className="shrink-0">
+          <a
+            href={bookmark.url}
+            target="_blank"
+            rel="noreferrer"
+            aria-label={`Open ${bookmark.title}`}
+            title="Open site"
+          >
+            <ExternalLink className="size-4" />
+          </a>
+        </Button>
       </div>
     </div>
   );
