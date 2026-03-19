@@ -1,9 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type FocusEvent,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Monitor, Smartphone, Tablet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,29 +22,12 @@ const VIEWPORTS: Record<
   PreviewViewportMode,
   {
     label: string;
-    previewAspectClass: string;
-    rootWidthClass: string;
     Icon: typeof Smartphone;
   }
 > = {
-  mobile: {
-    label: "Mobile",
-    previewAspectClass: "aspect-[9/16]",
-    rootWidthClass: "w-full max-w-[390px]",
-    Icon: Smartphone,
-  },
-  tablet: {
-    label: "Tablet",
-    previewAspectClass: "aspect-[3/4]",
-    rootWidthClass: "w-full max-w-[680px]",
-    Icon: Tablet,
-  },
-  desktop: {
-    label: "Desktop",
-    previewAspectClass: "aspect-video",
-    rootWidthClass: "w-full max-w-[1100px]",
-    Icon: Monitor,
-  },
+  mobile: { label: "Mobile", Icon: Smartphone },
+  tablet: { label: "Tablet", Icon: Tablet },
+  desktop: { label: "Desktop", Icon: Monitor },
 };
 
 export function BookmarkLiveCard({
@@ -66,11 +44,9 @@ export function BookmarkLiveCard({
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
   const [viewportMode, setViewportMode] =
     useState<PreviewViewportMode>("desktop");
-const [isPointerInside, setIsPointerInside] = useState(false);
+  const [isPointerInside, setIsPointerInside] = useState(false);
 
-const isInteractive = previewState === "ready" && isPointerInside;
-const viewport = VIEWPORTS[viewportMode];
- 
+  const isInteractive = previewState === "ready" && isPointerInside;
 
   useEffect(() => {
     const node = rootRef.current;
@@ -134,28 +110,26 @@ const viewport = VIEWPORTS[viewportMode];
     setPreviewState("ready");
   };
 
-const handlePointerEnter = () => {
-  setIsPointerInside(true);
-};
+  const handlePointerEnter = () => {
+    setIsPointerInside(true);
+  };
 
-const handlePointerLeave = () => {
-  setIsPointerInside(false);
-};
-
+  const handlePointerLeave = () => {
+    setIsPointerInside(false);
+  };
 
   return (
     <div
       ref={rootRef}
       className={cn(
-        "group overflow-hidden rounded-2xl border bg-background shadow-sm transition",
-        viewport.rootWidthClass,
+        "group flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border bg-background shadow-sm transition",
         selected && "ring-2 ring-ring/30",
       )}
     >
-      <div className="relative">
-        <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur-md">
+      <div className="relative min-h-0 flex-1">
+        <div className="bookmark-grid-drag-handle absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur-md">
           <div className="flex min-w-0 items-center gap-2">
-            <label className="inline-flex shrink-0 items-center rounded-md border bg-background/90 p-2 shadow-sm">
+            <label className="bookmark-grid-no-drag inline-flex shrink-0 items-center rounded-md border bg-background/90 p-2 shadow-sm">
               <input
                 type="checkbox"
                 checked={selected}
@@ -168,7 +142,7 @@ const handlePointerLeave = () => {
               />
             </label>
 
-            <div className="inline-flex items-center rounded-lg border bg-background/90 p-1 shadow-sm">
+            <div className="bookmark-grid-no-drag inline-flex items-center rounded-lg border bg-background/90 p-1 shadow-sm">
               {(Object.keys(VIEWPORTS) as PreviewViewportMode[]).map((mode) => {
                 const config = VIEWPORTS[mode];
                 const Icon = config.Icon;
@@ -178,9 +152,6 @@ const handlePointerLeave = () => {
                   <button
                     key={mode}
                     type="button"
-                    aria-label={`${config.label} view`}
-                    aria-pressed={active}
-                    title={config.label}
                     onClick={() => setViewportMode(mode)}
                     className={cn(
                       "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition",
@@ -205,10 +176,7 @@ const handlePointerLeave = () => {
         <div
           onPointerEnter={handlePointerEnter}
           onPointerLeave={handlePointerLeave}
-          className={cn(
-            "relative w-full overflow-hidden bg-muted",
-            viewport.previewAspectClass,
-          )}
+          className="relative h-full min-h-0 w-full overflow-hidden bg-muted"
         >
           {shouldMountFrame ? (
             <iframe
@@ -220,9 +188,7 @@ const handlePointerLeave = () => {
               className={cn(
                 "absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-300",
                 previewState === "ready" ? "opacity-100" : "opacity-0",
-                isInteractive && previewState === "ready"
-                  ? "pointer-events-auto"
-                  : "pointer-events-none",
+                isInteractive ? "pointer-events-auto" : "pointer-events-none",
               )}
             />
           ) : null}
@@ -242,40 +208,47 @@ const handlePointerLeave = () => {
         </div>
       </div>
 
-      <div className="flex items-start justify-between gap-3 border-t bg-background px-4 py-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium">{bookmark.title}</div>
+      <div className="shrink-0 border-t bg-background px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-medium">{bookmark.title}</div>
 
-          {bookmark.tags.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {bookmark.tags.slice(0, 4).map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  {tag}
-                </span>
-              ))}
-              {bookmark.tags.length > 4 ? (
-                <span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
-                  +{bookmark.tags.length - 4}
-                </span>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+            {bookmark.tags.length ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {bookmark.tags.slice(0, 4).map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground"
+                  >
+                    {tag}
+                  </span>
+                ))}
+                {bookmark.tags.length > 4 ? (
+                  <span className="rounded-md border px-2 py-0.5 text-xs text-muted-foreground">
+                    +{bookmark.tags.length - 4}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
-        <Button asChild variant="outline" size="icon" className="shrink-0">
-          <a
-            href={bookmark.url}
-            target="_blank"
-            rel="noreferrer"
-            aria-label={`Open ${bookmark.title}`}
-            title="Open site"
+          <Button
+            asChild
+            variant="outline"
+            size="icon"
+            className="bookmark-grid-no-drag shrink-0"
           >
-            <ExternalLink className="size-4" />
-          </a>
-        </Button>
+            <a
+              href={bookmark.url}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`Open ${bookmark.title}`}
+              title="Open site"
+            >
+              <ExternalLink className="size-4" />
+            </a>
+          </Button>
+        </div>
       </div>
     </div>
   );
