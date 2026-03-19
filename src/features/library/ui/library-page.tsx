@@ -15,6 +15,7 @@ import type {
 import { useLibraryViewStore } from "../model/library-view.store";
 import { BookmarksTable } from "./bookmarks-table";
 import { LibraryToolbar } from "./library-toolbar";
+import { BookmarksGrid } from "./bookmarks-grid";
 
 export function LibraryPage() {
   const [search, setSearch] = useState("");
@@ -184,9 +185,13 @@ export function LibraryPage() {
                 isBulkDeleting={deleteSelectedMutation.isPending}
               />
             ) : (
-              <div className="rounded-2xl border bg-background p-8 text-sm text-muted-foreground">
-                Grid View подключим следующим этапом.
-              </div>
+                <BookmarksGrid
+            data={filteredData}
+            rowSelection={rowSelection}
+            onRowSelectionChange={setRowSelection}
+            onEdit={(bookmark) => setEditingBookmark(bookmark)}
+            isBulkDeleting={deleteSelectedMutation.isPending}
+          />
             )}
           </>
         ) : null}

@@ -59,7 +59,6 @@ export function LibraryToolbar({
             type="button"
             variant={viewMode === "grid" ? "default" : "outline"}
             onClick={() => setViewMode("grid")}
-            disabled
           >
             <LayoutGrid className="mr-2 size-4" />
             Grid
