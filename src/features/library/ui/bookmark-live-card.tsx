@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+} from "react";
 import { ExternalLink, Monitor, Smartphone, Tablet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -22,31 +27,27 @@ const VIEWPORTS: Record<
   PreviewViewportMode,
   {
     label: string;
-    cardAspectClass: string;
-    width: number;
-    height: number;
+    previewAspectClass: string;
+    rootWidthClass: string;
     Icon: typeof Smartphone;
   }
 > = {
   mobile: {
     label: "Mobile",
-    cardAspectClass: "aspect-[3/4]",
-    width: 390,
-    height: 844,
+    previewAspectClass: "aspect-[9/16]",
+    rootWidthClass: "w-full max-w-[390px]",
     Icon: Smartphone,
   },
   tablet: {
     label: "Tablet",
-    cardAspectClass: "aspect-[3/4]",
-    width: 768,
-    height: 1024,
+    previewAspectClass: "aspect-[3/4]",
+    rootWidthClass: "w-full max-w-[680px]",
     Icon: Tablet,
   },
   desktop: {
     label: "Desktop",
-    cardAspectClass: "aspect-video",
-    width: 1440,
-    height: 810,
+    previewAspectClass: "aspect-video",
+    rootWidthClass: "w-full max-w-[1100px]",
     Icon: Monitor,
   },
 };
@@ -59,17 +60,17 @@ export function BookmarkLiveCard({
   isBulkDeleting = false,
 }: BookmarkLiveCardProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const previewRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
   const [shouldMountFrame, setShouldMountFrame] = useState(false);
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
   const [viewportMode, setViewportMode] =
     useState<PreviewViewportMode>("desktop");
-  const [isInteractive, setIsInteractive] = useState(false);
-  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
+const [isPointerInside, setIsPointerInside] = useState(false);
 
-  const viewport = VIEWPORTS[viewportMode];
+const isInteractive = previewState === "ready" && isPointerInside;
+const viewport = VIEWPORTS[viewportMode];
+ 
 
   useEffect(() => {
     const node = rootRef.current;
@@ -99,11 +100,16 @@ export function BookmarkLiveCard({
   }, [shouldMountFrame]);
 
   useEffect(() => {
-    if (!shouldMountFrame || previewState === "ready") {
+    if (!shouldMountFrame) {
       return;
     }
 
     setPreviewState("loading");
+
+    if (timeoutRef.current !== null) {
+      window.clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
 
     timeoutRef.current = window.setTimeout(() => {
       setPreviewState((current) =>
@@ -117,45 +123,7 @@ export function BookmarkLiveCard({
         timeoutRef.current = null;
       }
     };
-  }, [previewState, shouldMountFrame]);
-
-  useEffect(() => {
-    const node = previewRef.current;
-
-    if (!node) {
-      return;
-    }
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-
-      if (!entry) {
-        return;
-      }
-
-      const { width, height } = entry.contentRect;
-
-      setPreviewSize({
-        width,
-        height,
-      });
-    });
-
-    resizeObserver.observe(node);
-
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  const scale = useMemo(() => {
-    if (!previewSize.width || !previewSize.height) {
-      return 1;
-    }
-
-    return Math.min(
-      previewSize.width / viewport.width,
-      previewSize.height / viewport.height,
-    );
-  }, [previewSize.height, previewSize.width, viewport.height, viewport.width]);
+  }, [shouldMountFrame, viewportMode]);
 
   const handleFrameLoad = () => {
     if (timeoutRef.current !== null) {
@@ -166,42 +134,25 @@ export function BookmarkLiveCard({
     setPreviewState("ready");
   };
 
-  const handlePointerEnter = () => {
-    setIsInteractive(true);
-  };
+const handlePointerEnter = () => {
+  setIsPointerInside(true);
+};
 
-  const handlePointerLeave = () => {
-    setIsInteractive(false);
-  };
+const handlePointerLeave = () => {
+  setIsPointerInside(false);
+};
 
-  const handleFocusCapture = () => {
-    setIsInteractive(true);
-  };
-
-  const handleBlurCapture = (event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget;
-
-    if (!event.currentTarget.contains(nextTarget as Node | null)) {
-      setIsInteractive(false);
-    }
-  };
 
   return (
     <div
       ref={rootRef}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
-      onFocusCapture={handleFocusCapture}
-      onBlurCapture={handleBlurCapture}
       className={cn(
         "group overflow-hidden rounded-2xl border bg-background shadow-sm transition",
+        viewport.rootWidthClass,
         selected && "ring-2 ring-ring/30",
       )}
     >
-      <div
-        ref={previewRef}
-        className={cn("relative w-full overflow-hidden bg-muted", viewport.cardAspectClass)}
-      >
+      <div className="relative">
         <div className="absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur-md">
           <div className="flex min-w-0 items-center gap-2">
             <label className="inline-flex shrink-0 items-center rounded-md border bg-background/90 p-2 shadow-sm">
@@ -251,30 +202,29 @@ export function BookmarkLiveCard({
           </div>
         </div>
 
-        <div className="absolute inset-0">
+        <div
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
+          className={cn(
+            "relative w-full overflow-hidden bg-muted",
+            viewport.previewAspectClass,
+          )}
+        >
           {shouldMountFrame ? (
-            <div
-              className="absolute left-1/2 top-1/2 origin-center"
-              style={{
-                width: `${viewport.width}px`,
-                height: `${viewport.height}px`,
-                transform: `translate(-50%, -50%) scale(${scale})`,
-              }}
-            >
-              <iframe
-                src={bookmark.url}
-                title={bookmark.title}
-                loading="lazy"
-                onLoad={handleFrameLoad}
-                className={cn(
-                  "h-full w-full border-0 bg-white transition-opacity duration-300",
-                  previewState === "ready" ? "opacity-100" : "opacity-0",
-                  isInteractive && previewState === "ready"
-                    ? "pointer-events-auto"
-                    : "pointer-events-none",
-                )}
-              />
-            </div>
+            <iframe
+              key={`${bookmark.id}-${viewportMode}`}
+              src={bookmark.url}
+              title={bookmark.title}
+              loading="lazy"
+              onLoad={handleFrameLoad}
+              className={cn(
+                "absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-300",
+                previewState === "ready" ? "opacity-100" : "opacity-0",
+                isInteractive && previewState === "ready"
+                  ? "pointer-events-auto"
+                  : "pointer-events-none",
+              )}
+            />
           ) : null}
 
           {previewState !== "ready" ? (

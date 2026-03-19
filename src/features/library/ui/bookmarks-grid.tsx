@@ -42,7 +42,7 @@ export function BookmarksGrid({
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+    <div className="flex flex-wrap items-start gap-4">
       {data.map((bookmark) => (
         <BookmarkLiveCard
           key={bookmark.id}
