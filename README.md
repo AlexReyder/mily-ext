@@ -60,3 +60,29 @@ This template should help get you started developing with React in WXT.
 
 
 Прекрасно. Баг исправлен. Теперь я хочу, чтобы ты ознакомился с react-grid-layout и рассказал о возможностях как мы будем использовать ее в рамках Grid View. Мне бы хотелось, чтобы пользователи могли изменять размеры и положение Bookmark в режиме Grid View.
+
+Я прикрепил для тебя 2 скриншота с багами.
+1. У новых добавленых Bookmark подвал перекрывает слишком сильно iframe. 2. Если мы растянет один Bookmark на всю ширину, то мы не видим подвал.
+
+Прекрасно, баг исправлен. Теперь давай перейдем ко второму этапу итерации:
+1) Приведем в правильный вид  3 режима - Mobile, Tablet, Desktop. Я хочу, чтобы когда пользователь нажимает:
+ Mobile → карточке ставится рекомендуемый размер.
+ Tablet → другой рекомендуемый размер.
+ Desktop → широкий рекомендуемый размер.
+А потом пользователь может руками ещё подправить resize.
+2) Сделаем кнопку Reset Layout для Grid View.
+3) Разные layouts для breakpoints.
+4) Шапка карточки должна быть вне iframe. Она не должна перекрывать контент внутри iframe.
+
+У нас следующие typescript ошибки:
+1) Argument of type 'Partial<Record<GridBreakpoint, Layout>>' is not assignable to parameter of type 'Partial<Record<GridBreakpoint, BookmarkGridItem[]>>'.
+  Types of property 'lg' are incompatible.
+    Type 'Layout | undefined' is not assignable to type 'BookmarkGridItem[] | undefined'.
+      The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'BookmarkGridItem[]'.
+2) Object literal may only specify known properties, and 'padding' does not exist in type 'Partial<GridConfig>'.ts(2353)
+ResponsiveGridLayout-DqK__izz.d.mts(20, 5): The expected type comes from property 'gridConfig' which is declared here on type 'IntrinsicAttributes & GridLayoutProps'
+(property) padding: number[]
+
+Сейчас у нас ошибка в getLibraryGridLayouts:
+Argument of type 'Layout | undefined' is not assignable to parameter of type 'LayoutItem[] | undefined'.
+  The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'

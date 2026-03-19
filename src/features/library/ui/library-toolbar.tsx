@@ -1,4 +1,11 @@
-import { LayoutGrid, List, RefreshCw, Trash2, X } from "lucide-react";
+import {
+  LayoutGrid,
+  List,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLibraryViewStore } from "../model/library-view.store";
 
@@ -16,6 +23,9 @@ type LibraryToolbarProps = {
 
   isBulkDeleting?: boolean;
   isRefreshing?: boolean;
+
+  showResetGridLayout?: boolean;
+  onResetGridLayout?: () => void;
 };
 
 export function LibraryToolbar({
@@ -29,6 +39,8 @@ export function LibraryToolbar({
   onBulkDelete,
   isBulkDeleting = false,
   isRefreshing = false,
+  showResetGridLayout = false,
+  onResetGridLayout,
 }: LibraryToolbarProps) {
   const viewMode = useLibraryViewStore((state) => state.viewMode);
   const setViewMode = useLibraryViewStore((state) => state.setViewMode);
@@ -45,7 +57,7 @@ export function LibraryToolbar({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant={viewMode === "table" ? "default" : "outline"}
@@ -72,6 +84,18 @@ export function LibraryToolbar({
             <LayoutGrid className="mr-2 size-4" />
             Grid
           </Button>
+
+          {showResetGridLayout && onResetGridLayout ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onResetGridLayout}
+              disabled={isBulkDeleting}
+            >
+              <RotateCcw className="mr-2 size-4" />
+              Reset Layout
+            </Button>
+          ) : null}
 
           <Button
             type="button"

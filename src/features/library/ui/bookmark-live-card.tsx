@@ -4,22 +4,26 @@ import { ExternalLink, Monitor, Smartphone, Tablet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
+import type { BookmarkViewportPreset } from "../model/library-grid.types";
 
 type PreviewState = "idle" | "loading" | "ready" | "timeout";
-type PreviewViewportMode = "mobile" | "tablet" | "desktop";
 
 type BookmarkLiveCardProps = {
   bookmark: BookmarkRecord;
   selected: boolean;
   onToggleSelected: (bookmarkId: string, checked: boolean) => void;
   onEdit: (bookmark: BookmarkRecord) => void;
+  onViewportPresetChange: (
+    bookmarkId: string,
+    preset: BookmarkViewportPreset,
+  ) => void;
   isBulkDeleting?: boolean;
 };
 
 const PREVIEW_TIMEOUT_MS = 8000;
 
 const VIEWPORTS: Record<
-  PreviewViewportMode,
+  BookmarkViewportPreset,
   {
     label: string;
     Icon: typeof Smartphone;
@@ -35,6 +39,7 @@ export function BookmarkLiveCard({
   selected,
   onToggleSelected,
   onEdit,
+  onViewportPresetChange,
   isBulkDeleting = false,
 }: BookmarkLiveCardProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -43,7 +48,7 @@ export function BookmarkLiveCard({
   const [shouldMountFrame, setShouldMountFrame] = useState(false);
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
   const [viewportMode, setViewportMode] =
-    useState<PreviewViewportMode>("desktop");
+    useState<BookmarkViewportPreset>("desktop");
   const [isPointerInside, setIsPointerInside] = useState(false);
 
   const isInteractive = previewState === "ready" && isPointerInside;
@@ -118,6 +123,11 @@ export function BookmarkLiveCard({
     setIsPointerInside(false);
   };
 
+  const handleViewportChange = (preset: BookmarkViewportPreset) => {
+    setViewportMode(preset);
+    onViewportPresetChange(bookmark.id, preset);
+  };
+
   return (
     <div
       ref={rootRef}
@@ -126,8 +136,8 @@ export function BookmarkLiveCard({
         selected && "ring-2 ring-ring/30",
       )}
     >
-      <div className="relative min-h-0 flex-1">
-        <div className="bookmark-grid-drag-handle absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 border-b border-border/60 bg-background/85 px-3 py-2 backdrop-blur-md">
+      <div className="bookmark-grid-drag-handle shrink-0 cursor-grab border-b bg-background px-3 py-2 active:cursor-grabbing">
+        <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             <label className="bookmark-grid-no-drag inline-flex shrink-0 items-center rounded-md border bg-background/90 p-2 shadow-sm">
               <input
@@ -143,7 +153,7 @@ export function BookmarkLiveCard({
             </label>
 
             <div className="bookmark-grid-no-drag inline-flex items-center rounded-lg border bg-background/90 p-1 shadow-sm">
-              {(Object.keys(VIEWPORTS) as PreviewViewportMode[]).map((mode) => {
+              {(Object.keys(VIEWPORTS) as BookmarkViewportPreset[]).map((mode) => {
                 const config = VIEWPORTS[mode];
                 const Icon = config.Icon;
                 const active = viewportMode === mode;
@@ -152,7 +162,10 @@ export function BookmarkLiveCard({
                   <button
                     key={mode}
                     type="button"
-                    onClick={() => setViewportMode(mode)}
+                    aria-label={`${config.label} view`}
+                    aria-pressed={active}
+                    title={config.label}
+                    onClick={() => handleViewportChange(mode)}
                     className={cn(
                       "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition",
                       active
@@ -172,40 +185,40 @@ export function BookmarkLiveCard({
             {isInteractive ? "Interactive" : "Preview"}
           </div>
         </div>
+      </div>
 
-        <div
-          onPointerEnter={handlePointerEnter}
-          onPointerLeave={handlePointerLeave}
-          className="relative h-full min-h-0 w-full overflow-hidden bg-muted"
-        >
-          {shouldMountFrame ? (
-            <iframe
-              key={`${bookmark.id}-${viewportMode}`}
-              src={bookmark.url}
-              title={bookmark.title}
-              loading="lazy"
-              onLoad={handleFrameLoad}
-              className={cn(
-                "absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-300",
-                previewState === "ready" ? "opacity-100" : "opacity-0",
-                isInteractive ? "pointer-events-auto" : "pointer-events-none",
-              )}
-            />
-          ) : null}
+      <div
+        onPointerEnter={handlePointerEnter}
+        onPointerLeave={handlePointerLeave}
+        className="relative min-h-0 flex-1 overflow-hidden bg-muted"
+      >
+        {shouldMountFrame ? (
+          <iframe
+            key={`${bookmark.id}-${viewportMode}`}
+            src={bookmark.url}
+            title={bookmark.title}
+            loading="lazy"
+            onLoad={handleFrameLoad}
+            className={cn(
+              "absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-300",
+              previewState === "ready" ? "opacity-100" : "opacity-0",
+              isInteractive ? "pointer-events-auto" : "pointer-events-none",
+            )}
+          />
+        ) : null}
 
-          {previewState !== "ready" ? (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-muted px-6 text-center">
-              <div className="space-y-2">
-                <div className="text-sm font-medium">{bookmark.title}</div>
-                <div className="text-xs text-muted-foreground">
-                  {previewState === "timeout"
-                    ? "Сайт не дал показать live preview или отвечает слишком долго."
-                    : "Подготавливаем live preview."}
-                </div>
+        {previewState !== "ready" ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-muted px-6 text-center">
+            <div className="space-y-2">
+              <div className="text-sm font-medium">{bookmark.title}</div>
+              <div className="text-xs text-muted-foreground">
+                {previewState === "timeout"
+                  ? "Сайт не дал показать live preview или отвечает слишком долго."
+                  : "Подготавливаем live preview."}
               </div>
             </div>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
       </div>
 
       <div className="shrink-0 border-t bg-background px-4 py-3">

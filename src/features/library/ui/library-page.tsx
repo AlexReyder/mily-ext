@@ -18,13 +18,13 @@ import { LibraryToolbar } from "./library-toolbar";
 import { BookmarksGrid } from "./bookmarks-grid";
 import { BookmarksLargeIcons } from "./bookmarks-large-icons";
 
-
 export function LibraryPage() {
   const [search, setSearch] = useState("");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [editingBookmark, setEditingBookmark] = useState<BookmarkRecord | null>(
     null,
   );
+  const [gridResetNonce, setGridResetNonce] = useState(0);
 
   const viewMode = useLibraryViewStore((state) => state.viewMode);
   const queryClient = useQueryClient();
@@ -162,6 +162,12 @@ export function LibraryPage() {
           onBulkDelete={handleBulkDelete}
           isBulkDeleting={deleteSelectedMutation.isPending}
           isRefreshing={bookmarksQuery.isFetching}
+          showResetGridLayout={viewMode === "grid"}
+          onResetGridLayout={
+            viewMode === "grid"
+              ? () => setGridResetNonce((prev) => prev + 1)
+              : undefined
+          }
         />
 
         {bookmarksQuery.isLoading ? (
@@ -176,33 +182,34 @@ export function LibraryPage() {
           </div>
         ) : null}
 
-            {!bookmarksQuery.isLoading && !bookmarksQuery.isError ? (
-        <>
-          {viewMode === "table" ? (
-            <BookmarksTable
-              data={filteredData}
-              rowSelection={rowSelection}
-              onRowSelectionChange={setRowSelection}
-              onEdit={(bookmark) => setEditingBookmark(bookmark)}
-              isBulkDeleting={deleteSelectedMutation.isPending}
-            />
-          ) : viewMode === "grid" ? (
-            <BookmarksGrid
-              data={filteredData}
-              rowSelection={rowSelection}
-              onRowSelectionChange={setRowSelection}
-              onEdit={(bookmark) => setEditingBookmark(bookmark)}
-              isBulkDeleting={deleteSelectedMutation.isPending}
-            />
-          ) : (
-            <BookmarksLargeIcons
-              data={filteredData}
-              rowSelection={rowSelection}
-              onRowSelectionChange={setRowSelection}
-            />
-          )}
-        </>
-      ) : null}
+        {!bookmarksQuery.isLoading && !bookmarksQuery.isError ? (
+          <>
+            {viewMode === "table" ? (
+              <BookmarksTable
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                onEdit={(bookmark) => setEditingBookmark(bookmark)}
+                isBulkDeleting={deleteSelectedMutation.isPending}
+              />
+            ) : viewMode === "grid" ? (
+              <BookmarksGrid
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                onEdit={(bookmark) => setEditingBookmark(bookmark)}
+                isBulkDeleting={deleteSelectedMutation.isPending}
+                resetNonce={gridResetNonce}
+              />
+            ) : (
+              <BookmarksLargeIcons
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+              />
+            )}
+          </>
+        ) : null}
       </div>
 
       <EditBookmarkSheet
