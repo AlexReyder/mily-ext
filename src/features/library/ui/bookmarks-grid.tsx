@@ -6,12 +6,14 @@ import ReactGridLayout, {
   useContainerWidth,
   useResponsiveLayout,
 } from "react-grid-layout";
+import { noCompactor, verticalCompactor } from "react-grid-layout/core";
 
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
 import type {
   BookmarkGridItem,
   BookmarkViewportPreset,
   GridBreakpoint,
+  LibraryGridLayoutScope,
 } from "../model/library-grid.types";
 import {
   getLibraryGridLayouts,
@@ -21,6 +23,7 @@ import {
 import { BookmarkLiveCard } from "./bookmark-live-card";
 
 type BookmarksGridProps = {
+  mode: LibraryGridLayoutScope;
   data: BookmarkRecord[];
   rowSelection: RowSelectionState;
   onRowSelectionChange: Dispatch<SetStateAction<RowSelectionState>>;
@@ -68,6 +71,7 @@ const VIEWPORT_PRESETS: Record<
 };
 
 export function BookmarksGrid({
+  mode,
   data,
   rowSelection,
   onRowSelectionChange,
@@ -78,22 +82,26 @@ export function BookmarksGrid({
   const { width, containerRef, mounted } = useContainerWidth();
   const previousResetNonceRef = useRef(resetNonce);
 
+  const activeCompactor =
+    mode === "creative" ? noCompactor : verticalCompactor;
+
   const bookmarkIdsKey = useMemo(
     () => data.map((item) => item.id).sort().join("|"),
     [data],
   );
 
   const layoutQuery = useQuery({
-    queryKey: ["library-grid-layouts", bookmarkIdsKey],
-    queryFn: () => getLibraryGridLayouts(data),
+    queryKey: ["library-grid-layouts", mode, bookmarkIdsKey],
+    queryFn: () => getLibraryGridLayouts(mode, data),
   });
 
   const saveLayoutMutation = useMutation({
-    mutationFn: saveLibraryGridLayouts,
+    mutationFn: (layouts: Parameters<typeof saveLibraryGridLayouts>[1]) =>
+      saveLibraryGridLayouts(mode, layouts),
   });
 
   const resetLayoutMutation = useMutation({
-    mutationFn: resetLibraryGridLayouts,
+    mutationFn: () => resetLibraryGridLayouts(mode),
   });
 
   const {
@@ -108,6 +116,7 @@ export function BookmarksGrid({
     breakpoints: GRID_BREAKPOINTS,
     cols: GRID_COLS,
     layouts: layoutQuery.data ?? {},
+    compactor: activeCompactor,
   });
 
   useEffect(() => {
@@ -139,10 +148,10 @@ export function BookmarksGrid({
 
     void (async () => {
       await resetLayoutMutation.mutateAsync();
-      const defaults = await getLibraryGridLayouts(data);
+      const defaults = await getLibraryGridLayouts(mode, data);
       setLayouts(defaults);
     })();
-  }, [data, resetLayoutMutation, resetNonce, setLayouts]);
+  }, [data, mode, resetLayoutMutation, resetNonce, setLayouts]);
 
   const handleToggleSelected = (bookmarkId: string, checked: boolean) => {
     onRowSelectionChange((prev) => {
@@ -207,13 +216,11 @@ export function BookmarksGrid({
   return (
     <div ref={containerRef} className="w-full">
       <ReactGridLayout
+        key={`${mode}-${breakpoint}`} 
         width={width}
         layout={layout}
         onLayoutChange={(nextLayout) => {
-          setLayoutForBreakpoint(
-            breakpoint as GridBreakpoint,
-            nextLayout,
-          );
+          setLayoutForBreakpoint(breakpoint as GridBreakpoint, nextLayout);
         }}
         gridConfig={{
           cols,
@@ -226,12 +233,13 @@ export function BookmarksGrid({
           handle: ".bookmark-grid-drag-handle",
           cancel:
             ".bookmark-grid-no-drag,button,a,input,label,iframe,[data-no-drag='true']",
-          bounded: true,
+          bounded: mode === 'grid',
         }}
         resizeConfig={{
           enabled: !isBulkDeleting,
           handles: ["se"],
         }}
+        compactor={activeCompactor}
       >
         {data.map((bookmark) => (
           <div key={bookmark.id} className="h-full">

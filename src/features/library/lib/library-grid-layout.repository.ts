@@ -1,13 +1,18 @@
 import { db } from "@/lib/db";
+import type { Layout } from "react-grid-layout";
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
 import type {
   BookmarkGridItem,
   BookmarkGridLayoutRecord,
   BookmarkGridLayouts,
   GridBreakpoint,
+  LibraryGridLayoutScope,
 } from "../model/library-grid.types";
-import type { Layout } from "react-grid-layout";
-const GRID_LAYOUT_ID = "library-grid";
+
+const GRID_LAYOUT_IDS: Record<LibraryGridLayoutScope, string> = {
+  grid: "library-grid-layout",
+  creative: "library-creative-layout",
+};
 
 const GRID_COLS: Record<GridBreakpoint, number> = {
   lg: 12,
@@ -25,6 +30,10 @@ const DEFAULT_SIZES: Record<
   sm: { w: 3, h: 8, minW: 3, minH: 7, maxW: 6, maxH: 16 },
   xs: { w: 4, h: 7, minW: 2, minH: 6, maxW: 4, maxH: 14 },
 };
+
+function getLayoutId(scope: LibraryGridLayoutScope) {
+  return GRID_LAYOUT_IDS[scope];
+}
 
 function createDefaultItem(
   id: string,
@@ -51,15 +60,19 @@ function normalizeLayoutForBreakpoint(
   const storedById = new Map((storedItems ?? []).map((item) => [item.i, item]));
 
   return bookmarks.map((bookmark, index) => {
-    return storedById.get(bookmark.id) ?? createDefaultItem(bookmark.id, index, breakpoint);
+    return (
+      storedById.get(bookmark.id) ??
+      createDefaultItem(bookmark.id, index, breakpoint)
+    );
   });
 }
 
 export async function getLibraryGridLayouts(
+  scope: LibraryGridLayoutScope,
   bookmarks: BookmarkRecord[],
 ): Promise<BookmarkGridLayouts> {
-  const record = await db.libraryGridLayouts.get(GRID_LAYOUT_ID);
-  const legacyItems = (record as { items?: BookmarkGridItem[] } | undefined)?.items;
+  const record = await db.libraryGridLayouts.get(getLayoutId(scope));
+  const legacyItems = (record as { items?: Layout } | undefined)?.items;
 
   return {
     lg: normalizeLayoutForBreakpoint(
@@ -86,15 +99,16 @@ export async function getLibraryGridLayouts(
 }
 
 export async function saveLibraryGridLayouts(
+  scope: LibraryGridLayoutScope,
   layouts: BookmarkGridLayouts,
 ): Promise<BookmarkGridLayoutRecord> {
   const record: BookmarkGridLayoutRecord = {
-    id: GRID_LAYOUT_ID,
+    id: getLayoutId(scope),
     layouts: {
-      lg: layouts.lg?.map((item) => ({ ...item })),
-      md: layouts.md?.map((item) => ({ ...item })),
-      sm: layouts.sm?.map((item) => ({ ...item })),
-      xs: layouts.xs?.map((item) => ({ ...item })),
+      lg: layouts.lg ? [...layouts.lg] : undefined,
+      md: layouts.md ? [...layouts.md] : undefined,
+      sm: layouts.sm ? [...layouts.sm] : undefined,
+      xs: layouts.xs ? [...layouts.xs] : undefined,
     },
     updatedAt: new Date().toISOString(),
   };
@@ -104,6 +118,6 @@ export async function saveLibraryGridLayouts(
   return record;
 }
 
-export async function resetLibraryGridLayouts() {
-  await db.libraryGridLayouts.delete(GRID_LAYOUT_ID);
+export async function resetLibraryGridLayouts(scope: LibraryGridLayoutScope) {
+  await db.libraryGridLayouts.delete(getLayoutId(scope));
 }

@@ -1,6 +1,7 @@
 import {
   LayoutGrid,
   List,
+  Palette,
   RefreshCw,
   RotateCcw,
   Trash2,
@@ -83,6 +84,15 @@ export function LibraryToolbar({
           >
             <LayoutGrid className="mr-2 size-4" />
             Grid
+          </Button>
+
+          <Button
+            type="button"
+            variant={viewMode === "creative" ? "default" : "outline"}
+            onClick={() => setViewMode("creative")}
+          >
+            <Palette className="mr-2 size-4" />
+            Creative
           </Button>
 
           {showResetGridLayout && onResetGridLayout ? (

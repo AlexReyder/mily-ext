@@ -25,6 +25,7 @@ export function LibraryPage() {
     null,
   );
   const [gridResetNonce, setGridResetNonce] = useState(0);
+  const [creativeResetNonce, setCreativeResetNonce] = useState(0);
 
   const viewMode = useLibraryViewStore((state) => state.viewMode);
   const queryClient = useQueryClient();
@@ -139,6 +140,20 @@ export function LibraryPage() {
     deleteSelectedMutation.mutate(selectedIds);
   };
 
+  const showResetGridLayout =
+    viewMode === "grid" || viewMode === "creative";
+
+  const activeResetHandler = showResetGridLayout
+    ? () => {
+        if (viewMode === "creative") {
+          setCreativeResetNonce((prev) => prev + 1);
+          return;
+        }
+
+        setGridResetNonce((prev) => prev + 1);
+      }
+    : undefined;
+
   return (
     <div className="min-h-screen bg-muted/30">
       <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
@@ -162,12 +177,8 @@ export function LibraryPage() {
           onBulkDelete={handleBulkDelete}
           isBulkDeleting={deleteSelectedMutation.isPending}
           isRefreshing={bookmarksQuery.isFetching}
-          showResetGridLayout={viewMode === "grid"}
-          onResetGridLayout={
-            viewMode === "grid"
-              ? () => setGridResetNonce((prev) => prev + 1)
-              : undefined
-          }
+          showResetGridLayout={showResetGridLayout}
+          onResetGridLayout={activeResetHandler}
         />
 
         {bookmarksQuery.isLoading ? (
@@ -194,12 +205,25 @@ export function LibraryPage() {
               />
             ) : viewMode === "grid" ? (
               <BookmarksGrid
+                key="grid"
+                mode="grid"
                 data={filteredData}
                 rowSelection={rowSelection}
                 onRowSelectionChange={setRowSelection}
                 onEdit={(bookmark) => setEditingBookmark(bookmark)}
                 isBulkDeleting={deleteSelectedMutation.isPending}
                 resetNonce={gridResetNonce}
+              />
+            ) : viewMode === "creative" ? (
+              <BookmarksGrid
+                key="creative"
+                mode="creative"
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                onEdit={(bookmark) => setEditingBookmark(bookmark)}
+                isBulkDeleting={deleteSelectedMutation.isPending}
+                resetNonce={creativeResetNonce}
               />
             ) : (
               <BookmarksLargeIcons

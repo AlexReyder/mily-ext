@@ -86,3 +86,19 @@ ResponsiveGridLayout-DqK__izz.d.mts(20, 5): The expected type comes from propert
 Сейчас у нас ошибка в getLibraryGridLayouts:
 Argument of type 'Layout | undefined' is not assignable to parameter of type 'LayoutItem[] | undefined'.
   The type 'Layout' is 'readonly' and cannot be assigned to the mutable type 'LayoutItem[]'
+
+
+
+Хорошо, давай добавим  alignment для Grid View и сделаем toggle между Smart Pack / Free Canvas.
+
+А в чем разница между Grid и Creative? Я попробовал и не заметил. 
+1) Есть баг, когда мы переключаемся из Creative в Grid, то у нас начинает дергаться карточки iframe. 
+2) Когда я хочу перетащить карточку вниз, я не всегда могу это сделать.
+
+
+
+Заметил один баг, что если я в режиме Grid и добавляю новый сайт, а потом переключаюсь на Creative, то не вижу добавленного сайта.
+Также я бы хотел немного изменить логику. Сейчас нет большой разницы для посетителя и ценности между Grid и Creative. Поэтому я предлагаю сделать так:
+1) В режиме Grid мы не можем изменять размер карточки вручную, только через кнопки Mobile / Tablet / Desktop. После резайза Grid автоматически должен выполняться alignment. Т.е. 1 карточку мы поставили на Mobile, она уменьшилась, а 2 карточка которая находится рядом с ней была на Desktop, поэтому мы сдвигаем 2 карточку ближе ко 1. Ты понял мою логику?
+2) В режиме Creative мы разрешаем overlap.
+Вопрос: есть ли смысл написать 2 кодовые базы вместо объединения в 1, как мы делали ранее?
