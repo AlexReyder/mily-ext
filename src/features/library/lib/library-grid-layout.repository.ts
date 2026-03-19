@@ -39,6 +39,7 @@ function createDefaultItem(
   id: string,
   index: number,
   breakpoint: GridBreakpoint,
+  position?: Partial<Pick<BookmarkGridItem, "x" | "y">>,
 ): BookmarkGridItem {
   const preset = DEFAULT_SIZES[breakpoint];
   const cols = GRID_COLS[breakpoint];
@@ -46,10 +47,27 @@ function createDefaultItem(
 
   return {
     i: id,
-    x: (index % itemsPerRow) * preset.w,
-    y: Math.floor(index / itemsPerRow) * preset.h,
+    x: position?.x ?? (index % itemsPerRow) * preset.w,
+    y: position?.y ?? Math.floor(index / itemsPerRow) * preset.h,
     ...preset,
   };
+}
+
+function getLayoutBottom(items: Layout | undefined) {
+  return (items ?? []).reduce((max, item) => {
+    return Math.max(max, item.y + item.h);
+  }, 0);
+}
+
+function createAppendedItem(
+  id: string,
+  breakpoint: GridBreakpoint,
+  nextY: number,
+): BookmarkGridItem {
+  return createDefaultItem(id, 0, breakpoint, {
+    x: 0,
+    y: nextY,
+  });
 }
 
 function normalizeLayoutForBreakpoint(
@@ -57,13 +75,36 @@ function normalizeLayoutForBreakpoint(
   bookmarks: BookmarkRecord[],
   breakpoint: GridBreakpoint,
 ): Layout {
-  const storedById = new Map((storedItems ?? []).map((item) => [item.i, item]));
+  const bookmarkIds = new Set(bookmarks.map((bookmark) => bookmark.id));
 
-  return bookmarks.map((bookmark, index) => {
-    return (
-      storedById.get(bookmark.id) ??
-      createDefaultItem(bookmark.id, index, breakpoint)
+  const filteredStoredItems = (storedItems ?? []).filter((item) =>
+    bookmarkIds.has(item.i),
+  );
+
+  const storedById = new Map(filteredStoredItems.map((item) => [item.i, item]));
+
+  if (!filteredStoredItems.length) {
+    return bookmarks.map((bookmark, index) =>
+      createDefaultItem(bookmark.id, index, breakpoint),
     );
+  }
+
+  let nextY = getLayoutBottom(filteredStoredItems);
+  const appendedById = new Map<string, BookmarkGridItem>();
+
+  for (const bookmark of bookmarks) {
+    if (storedById.has(bookmark.id)) {
+      continue;
+    }
+
+    const appendedItem = createAppendedItem(bookmark.id, breakpoint, nextY);
+
+    appendedById.set(bookmark.id, appendedItem);
+    nextY += appendedItem.h;
+  }
+
+  return bookmarks.map((bookmark) => {
+    return storedById.get(bookmark.id) ?? appendedById.get(bookmark.id)!;
   });
 }
 

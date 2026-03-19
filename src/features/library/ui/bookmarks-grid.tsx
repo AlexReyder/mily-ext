@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 import type { RowSelectionState } from "@tanstack/react-table";
+import type { Layout } from "react-grid-layout";
 import ReactGridLayout, {
   useContainerWidth,
   useResponsiveLayout,
 } from "react-grid-layout";
-import { noCompactor, verticalCompactor } from "react-grid-layout/core";
+import { verticalCompactor } from "react-grid-layout/core";
 
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
 import type {
@@ -70,6 +71,34 @@ const VIEWPORT_PRESETS: Record<
   },
 };
 
+const creativeOverlapCompactor: typeof verticalCompactor = {
+  type: null,
+  allowOverlap: true,
+  compact(layout: Layout, _cols: number) {
+    return layout.map((item) => ({ ...item }));
+  },
+};
+
+const GRID_MODE_CONFIG: Record<
+  LibraryGridLayoutScope,
+  {
+    compactor: typeof verticalCompactor;
+    allowManualResize: boolean;
+    boundedDrag: boolean;
+  }
+> = {
+  grid: {
+    compactor: verticalCompactor,
+    allowManualResize: false,
+    boundedDrag: false,
+  },
+  creative: {
+    compactor: creativeOverlapCompactor,
+    allowManualResize: true,
+    boundedDrag: false,
+  },
+};
+
 export function BookmarksGrid({
   mode,
   data,
@@ -82,8 +111,8 @@ export function BookmarksGrid({
   const { width, containerRef, mounted } = useContainerWidth();
   const previousResetNonceRef = useRef(resetNonce);
 
-  const activeCompactor =
-    mode === "creative" ? noCompactor : verticalCompactor;
+  const modeConfig = GRID_MODE_CONFIG[mode];
+  const activeCompactor = modeConfig.compactor;
 
   const bookmarkIdsKey = useMemo(
     () => data.map((item) => item.id).sort().join("|"),
@@ -174,7 +203,7 @@ export function BookmarksGrid({
     const bp = breakpoint as GridBreakpoint;
     const config = VIEWPORT_PRESETS[preset][bp];
 
-    const nextLayout = layout.map((item) => {
+    const resizedLayout = layout.map((item) => {
       if (item.i !== bookmarkId) {
         return item;
       }
@@ -191,6 +220,11 @@ export function BookmarksGrid({
         minH: config.minH,
       };
     });
+
+    const nextLayout =
+      mode === "grid"
+        ? activeCompactor.compact(resizedLayout, GRID_COLS[bp])
+        : resizedLayout;
 
     setLayoutForBreakpoint(bp, nextLayout);
   };
@@ -214,9 +248,12 @@ export function BookmarksGrid({
   }
 
   return (
-    <div ref={containerRef} className="w-full">
+    <div
+      ref={containerRef}
+      className={mode === "creative" ? "w-full rounded-3xl border border-dashed p-3" : "w-full"}
+    >
       <ReactGridLayout
-        key={`${mode}-${breakpoint}`} 
+        key={`${mode}-${breakpoint}`}
         width={width}
         layout={layout}
         onLayoutChange={(nextLayout) => {
@@ -226,17 +263,17 @@ export function BookmarksGrid({
           cols,
           rowHeight: 56,
           margin: [16, 16],
-          containerPadding: [0, 0],
+          containerPadding: mode === "creative" ? [8, 8] : [0, 0],
         }}
         dragConfig={{
           enabled: !isBulkDeleting,
           handle: ".bookmark-grid-drag-handle",
           cancel:
             ".bookmark-grid-no-drag,button,a,input,label,iframe,[data-no-drag='true']",
-          bounded: mode === 'grid',
+          bounded: modeConfig.boundedDrag,
         }}
         resizeConfig={{
-          enabled: !isBulkDeleting,
+          enabled: !isBulkDeleting && modeConfig.allowManualResize,
           handles: ["se"],
         }}
         compactor={activeCompactor}

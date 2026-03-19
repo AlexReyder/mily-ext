@@ -2,6 +2,7 @@ import {
   LayoutGrid,
   List,
   Palette,
+  Monitor,
   RefreshCw,
   RotateCcw,
   Trash2,
@@ -84,6 +85,15 @@ export function LibraryToolbar({
           >
             <LayoutGrid className="mr-2 size-4" />
             Grid
+          </Button>
+
+          <Button
+            type="button"
+            variant={viewMode === "fullscreen" ? "default" : "outline"}
+            onClick={() => setViewMode("fullscreen")}
+          >
+            <Monitor className="mr-2 size-4" />
+            Fullscreen
           </Button>
 
           <Button

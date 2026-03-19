@@ -17,6 +17,7 @@ import { BookmarksTable } from "./bookmarks-table";
 import { LibraryToolbar } from "./library-toolbar";
 import { BookmarksGrid } from "./bookmarks-grid";
 import { BookmarksLargeIcons } from "./bookmarks-large-icons";
+import { BookmarksFullscreen } from "./bookmarks-fullscreen";
 
 export function LibraryPage() {
   const [search, setSearch] = useState("");
@@ -224,6 +225,14 @@ export function LibraryPage() {
                 onEdit={(bookmark) => setEditingBookmark(bookmark)}
                 isBulkDeleting={deleteSelectedMutation.isPending}
                 resetNonce={creativeResetNonce}
+              />
+            ) : viewMode === "fullscreen" ? (
+              <BookmarksFullscreen
+                data={filteredData}
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
+                onEdit={(bookmark) => setEditingBookmark(bookmark)}
+                isBulkDeleting={deleteSelectedMutation.isPending}
               />
             ) : (
               <BookmarksLargeIcons
