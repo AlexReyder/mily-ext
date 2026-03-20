@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Dispatch, SetStateAction } from "react";
 import type { RowSelectionState } from "@tanstack/react-table";
 import type { Layout } from "react-grid-layout";
@@ -12,14 +12,17 @@ import { verticalCompactor } from "react-grid-layout/core";
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
 import type {
   BookmarkGridItem,
+  BookmarkGridLayouts,
+  BookmarkGridState,
   BookmarkViewportPreset,
+  BookmarkViewportPresets,
   GridBreakpoint,
   LibraryGridLayoutScope,
 } from "../model/library-grid.types";
 import {
-  getLibraryGridLayouts,
+  getLibraryGridState,
   resetLibraryGridLayouts,
-  saveLibraryGridLayouts,
+  saveLibraryGridState,
 } from "../lib/library-grid-layout.repository";
 import { BookmarkLiveCard } from "./bookmark-live-card";
 
@@ -110,6 +113,11 @@ export function BookmarksGrid({
 }: BookmarksGridProps) {
   const { width, containerRef, mounted } = useContainerWidth();
   const previousResetNonceRef = useRef(resetNonce);
+  const hasHydratedRef = useRef(false);
+  const queryClient = useQueryClient();
+
+  const [viewportPresets, setViewportPresets] =
+    useState<BookmarkViewportPresets>({});
 
   const modeConfig = GRID_MODE_CONFIG[mode];
   const activeCompactor = modeConfig.compactor;
@@ -119,14 +127,18 @@ export function BookmarksGrid({
     [data],
   );
 
-  const layoutQuery = useQuery({
-    queryKey: ["library-grid-layouts", mode, bookmarkIdsKey],
-    queryFn: () => getLibraryGridLayouts(mode, data),
+  const stateQueryKey = useMemo(
+    () => ["library-grid-state", mode, bookmarkIdsKey] as const,
+    [bookmarkIdsKey, mode],
+  );
+
+  const stateQuery = useQuery({
+    queryKey: stateQueryKey,
+    queryFn: () => getLibraryGridState(mode, data),
   });
 
-  const saveLayoutMutation = useMutation({
-    mutationFn: (layouts: Parameters<typeof saveLibraryGridLayouts>[1]) =>
-      saveLibraryGridLayouts(mode, layouts),
+  const saveStateMutation = useMutation({
+    mutationFn: (state: BookmarkGridState) => saveLibraryGridState(mode, state),
   });
 
   const resetLayoutMutation = useMutation({
@@ -144,29 +156,36 @@ export function BookmarksGrid({
     width,
     breakpoints: GRID_BREAKPOINTS,
     cols: GRID_COLS,
-    layouts: layoutQuery.data ?? {},
+    layouts: stateQuery.data?.layouts ?? {},
     compactor: activeCompactor,
   });
 
   useEffect(() => {
-    if (layoutQuery.data) {
-      setLayouts(layoutQuery.data);
+    if (!stateQuery.data) {
+      return;
     }
-  }, [layoutQuery.data, setLayouts]);
+
+    setLayouts(stateQuery.data.layouts);
+    setViewportPresets(stateQuery.data.viewportPresets);
+    hasHydratedRef.current = true;
+  }, [setLayouts, stateQuery.data]);
 
   useEffect(() => {
-    if (!mounted || !Object.keys(layouts).length) {
+    if (!mounted || !hasHydratedRef.current || !Object.keys(layouts).length) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      void saveLayoutMutation.mutateAsync(layouts);
+      void saveStateMutation.mutateAsync({
+        layouts,
+        viewportPresets,
+      });
     }, 250);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, [layouts, mounted, saveLayoutMutation]);
+  }, [layouts, mounted, saveStateMutation, viewportPresets]);
 
   useEffect(() => {
     if (resetNonce === previousResetNonceRef.current) {
@@ -177,10 +196,24 @@ export function BookmarksGrid({
 
     void (async () => {
       await resetLayoutMutation.mutateAsync();
-      const defaults = await getLibraryGridLayouts(mode, data);
-      setLayouts(defaults);
+
+      const defaults = await getLibraryGridState(mode, data);
+
+      setLayouts(defaults.layouts);
+      setViewportPresets(defaults.viewportPresets);
+      hasHydratedRef.current = true;
+
+      queryClient.setQueryData<BookmarkGridState>(stateQueryKey, defaults);
     })();
-  }, [data, mode, resetLayoutMutation, resetNonce, setLayouts]);
+  }, [
+    data,
+    mode,
+    queryClient,
+    resetLayoutMutation,
+    resetNonce,
+    setLayouts,
+    stateQueryKey,
+  ]);
 
   const handleToggleSelected = (bookmarkId: string, checked: boolean) => {
     onRowSelectionChange((prev) => {
@@ -226,7 +259,28 @@ export function BookmarksGrid({
         ? activeCompactor.compact(resizedLayout, GRID_COLS[bp])
         : resizedLayout;
 
+    const nextLayouts: BookmarkGridLayouts = {
+      ...layouts,
+      [bp]: nextLayout,
+    };
+
+    const nextViewportPresets: BookmarkViewportPresets = {
+      ...viewportPresets,
+      [bookmarkId]: preset,
+    };
+
     setLayoutForBreakpoint(bp, nextLayout);
+    setViewportPresets(nextViewportPresets);
+
+    queryClient.setQueryData<BookmarkGridState>(stateQueryKey, {
+      layouts: nextLayouts,
+      viewportPresets: nextViewportPresets,
+    });
+
+    void saveStateMutation.mutateAsync({
+      layouts: nextLayouts,
+      viewportPresets: nextViewportPresets,
+    });
   };
 
   if (!data.length) {
@@ -237,7 +291,7 @@ export function BookmarksGrid({
     );
   }
 
-  if (!mounted || layoutQuery.isLoading || !layout.length) {
+  if (!mounted || stateQuery.isLoading || !layout.length) {
     return (
       <div ref={containerRef} className="w-full">
         <div className="rounded-2xl border bg-background p-10 text-center text-sm text-muted-foreground">
@@ -250,7 +304,11 @@ export function BookmarksGrid({
   return (
     <div
       ref={containerRef}
-      className={mode === "creative" ? "w-full rounded-3xl border border-dashed p-3" : "w-full"}
+      className={
+        mode === "creative"
+          ? "w-full rounded-3xl border border-dashed p-3"
+          : "w-full"
+      }
     >
       <ReactGridLayout
         key={`${mode}-${breakpoint}`}
@@ -283,6 +341,7 @@ export function BookmarksGrid({
             <BookmarkLiveCard
               bookmark={bookmark}
               selected={Boolean(rowSelection[bookmark.id])}
+              viewportMode={viewportPresets[bookmark.id] ?? "desktop"}
               onToggleSelected={handleToggleSelected}
               onEdit={onEdit}
               onViewportPresetChange={applyViewportPreset}

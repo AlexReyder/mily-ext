@@ -11,6 +11,7 @@ type PreviewState = "idle" | "loading" | "ready" | "timeout";
 type BookmarkLiveCardProps = {
   bookmark: BookmarkRecord;
   selected: boolean;
+  viewportMode: BookmarkViewportPreset;
   onToggleSelected: (bookmarkId: string, checked: boolean) => void;
   onEdit: (bookmark: BookmarkRecord) => void;
   onViewportPresetChange: (
@@ -37,6 +38,7 @@ const VIEWPORTS: Record<
 export function BookmarkLiveCard({
   bookmark,
   selected,
+  viewportMode,
   onToggleSelected,
   onEdit,
   onViewportPresetChange,
@@ -47,8 +49,6 @@ export function BookmarkLiveCard({
 
   const [shouldMountFrame, setShouldMountFrame] = useState(false);
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
-  const [viewportMode, setViewportMode] =
-    useState<BookmarkViewportPreset>("desktop");
   const [isPointerInside, setIsPointerInside] = useState(false);
 
   const isInteractive = previewState === "ready" && isPointerInside;
@@ -124,7 +124,6 @@ export function BookmarkLiveCard({
   };
 
   const handleViewportChange = (preset: BookmarkViewportPreset) => {
-    setViewportMode(preset);
     onViewportPresetChange(bookmark.id, preset);
   };
 

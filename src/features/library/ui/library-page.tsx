@@ -228,11 +228,7 @@ export function LibraryPage() {
               />
             ) : viewMode === "fullscreen" ? (
               <BookmarksFullscreen
-                data={filteredData}
-                rowSelection={rowSelection}
-                onRowSelectionChange={setRowSelection}
-                onEdit={(bookmark) => setEditingBookmark(bookmark)}
-                isBulkDeleting={deleteSelectedMutation.isPending}
+                 data={filteredData}
               />
             ) : (
               <BookmarksLargeIcons

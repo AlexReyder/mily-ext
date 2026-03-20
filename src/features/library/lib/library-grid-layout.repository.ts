@@ -5,6 +5,9 @@ import type {
   BookmarkGridItem,
   BookmarkGridLayoutRecord,
   BookmarkGridLayouts,
+  BookmarkGridState,
+  BookmarkViewportPreset,
+  BookmarkViewportPresets,
   GridBreakpoint,
   LibraryGridLayoutScope,
 } from "../model/library-grid.types";
@@ -31,8 +34,45 @@ const DEFAULT_SIZES: Record<
   xs: { w: 4, h: 7, minW: 2, minH: 6, maxW: 4, maxH: 14 },
 };
 
+const VIEWPORT_PRESET_SIZES: Record<
+  BookmarkViewportPreset,
+  Record<GridBreakpoint, Pick<BookmarkGridItem, "w" | "h" | "minW" | "minH">>
+> = {
+  mobile: {
+    lg: { w: 4, h: 11, minW: 4, minH: 8 },
+    md: { w: 4, h: 10, minW: 4, minH: 8 },
+    sm: { w: 3, h: 9, minW: 3, minH: 7 },
+    xs: { w: 2, h: 8, minW: 2, minH: 7 },
+  },
+  tablet: {
+    lg: { w: 6, h: 10, minW: 5, minH: 8 },
+    md: { w: 6, h: 9, minW: 5, minH: 8 },
+    sm: { w: 4, h: 8, minW: 4, minH: 7 },
+    xs: { w: 4, h: 7, minW: 4, minH: 6 },
+  },
+  desktop: {
+    lg: { w: 8, h: 10, minW: 6, minH: 8 },
+    md: { w: 8, h: 9, minW: 6, minH: 8 },
+    sm: { w: 6, h: 8, minW: 6, minH: 7 },
+    xs: { w: 4, h: 7, minW: 4, minH: 6 },
+  },
+};
+
+const VIEWPORT_PRESET_VALUES: BookmarkViewportPreset[] = [
+  "mobile",
+  "tablet",
+  "desktop",
+];
+
 function getLayoutId(scope: LibraryGridLayoutScope) {
   return GRID_LAYOUT_IDS[scope];
+}
+
+function isValidViewportPreset(value: unknown): value is BookmarkViewportPreset {
+  return (
+    typeof value === "string" &&
+    VIEWPORT_PRESET_VALUES.includes(value as BookmarkViewportPreset)
+  );
 }
 
 function createDefaultItem(
@@ -108,14 +148,83 @@ function normalizeLayoutForBreakpoint(
   });
 }
 
-export async function getLibraryGridLayouts(
+function inferViewportPresetFromItem(
+  item: Layout[number] | undefined,
+  breakpoint: GridBreakpoint,
+): BookmarkViewportPreset {
+  if (!item) {
+    return "desktop";
+  }
+
+  for (const preset of VIEWPORT_PRESET_VALUES) {
+    const config = VIEWPORT_PRESET_SIZES[preset][breakpoint];
+
+    if (item.w === config.w && item.h === config.h) {
+      return preset;
+    }
+  }
+
+  return "desktop";
+}
+
+function inferViewportPreset(
+  layouts: BookmarkGridLayouts,
+  bookmarkId: string,
+): BookmarkViewportPreset {
+  const breakpoints: GridBreakpoint[] = ["lg", "md", "sm", "xs"];
+
+  for (const breakpoint of breakpoints) {
+    const item = layouts[breakpoint]?.find((layoutItem) => layoutItem.i === bookmarkId);
+
+    if (item) {
+      return inferViewportPresetFromItem(item, breakpoint);
+    }
+  }
+
+  return "desktop";
+}
+
+function normalizeViewportPresets(
+  storedViewportPresets: BookmarkViewportPresets | undefined,
+  bookmarks: BookmarkRecord[],
+  layouts: BookmarkGridLayouts,
+): BookmarkViewportPresets {
+  const nextViewportPresets: BookmarkViewportPresets = {};
+
+  for (const bookmark of bookmarks) {
+    const storedPreset = storedViewportPresets?.[bookmark.id];
+
+    nextViewportPresets[bookmark.id] = isValidViewportPreset(storedPreset)
+      ? storedPreset
+      : inferViewportPreset(layouts, bookmark.id);
+  }
+
+  return nextViewportPresets;
+}
+
+function cloneLayouts(layouts: BookmarkGridLayouts): BookmarkGridLayouts {
+  return {
+    lg: layouts.lg ? [...layouts.lg] : undefined,
+    md: layouts.md ? [...layouts.md] : undefined,
+    sm: layouts.sm ? [...layouts.sm] : undefined,
+    xs: layouts.xs ? [...layouts.xs] : undefined,
+  };
+}
+
+function cloneViewportPresets(
+  viewportPresets: BookmarkViewportPresets,
+): BookmarkViewportPresets {
+  return { ...viewportPresets };
+}
+
+export async function getLibraryGridState(
   scope: LibraryGridLayoutScope,
   bookmarks: BookmarkRecord[],
-): Promise<BookmarkGridLayouts> {
+): Promise<BookmarkGridState> {
   const record = await db.libraryGridLayouts.get(getLayoutId(scope));
   const legacyItems = (record as { items?: Layout } | undefined)?.items;
 
-  return {
+  const layouts: BookmarkGridLayouts = {
     lg: normalizeLayoutForBreakpoint(
       record?.layouts?.lg ?? legacyItems,
       bookmarks,
@@ -137,20 +246,25 @@ export async function getLibraryGridLayouts(
       "xs",
     ),
   };
+
+  return {
+    layouts,
+    viewportPresets: normalizeViewportPresets(
+      record?.viewportPresets,
+      bookmarks,
+      layouts,
+    ),
+  };
 }
 
-export async function saveLibraryGridLayouts(
+export async function saveLibraryGridState(
   scope: LibraryGridLayoutScope,
-  layouts: BookmarkGridLayouts,
+  state: BookmarkGridState,
 ): Promise<BookmarkGridLayoutRecord> {
   const record: BookmarkGridLayoutRecord = {
     id: getLayoutId(scope),
-    layouts: {
-      lg: layouts.lg ? [...layouts.lg] : undefined,
-      md: layouts.md ? [...layouts.md] : undefined,
-      sm: layouts.sm ? [...layouts.sm] : undefined,
-      xs: layouts.xs ? [...layouts.xs] : undefined,
-    },
+    layouts: cloneLayouts(state.layouts),
+    viewportPresets: cloneViewportPresets(state.viewportPresets),
     updatedAt: new Date().toISOString(),
   };
 
