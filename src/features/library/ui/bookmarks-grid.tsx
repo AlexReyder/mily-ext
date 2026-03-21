@@ -10,8 +10,8 @@ import ReactGridLayout, {
 import { verticalCompactor } from "react-grid-layout/core";
 
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
+import { isWebsiteBookmark } from "@/features/bookmark/model/bookmark.types";
 import type {
-  BookmarkGridItem,
   BookmarkGridLayouts,
   BookmarkGridState,
   BookmarkViewportPreset,
@@ -24,6 +24,12 @@ import {
   resetLibraryGridLayouts,
   saveLibraryGridState,
 } from "../lib/library-grid-layout.repository";
+import {
+  getBookmarkViewportPreset,
+  GRID_COLS,
+  normalizeBookmarkLayoutItem,
+  resolveBookmarkItemMetrics,
+} from "../lib/bookmark-layout-metrics";
 import { BookmarkLiveCard } from "./bookmark-live-card";
 
 type BookmarksGridProps = {
@@ -41,37 +47,6 @@ const GRID_BREAKPOINTS: Record<GridBreakpoint, number> = {
   md: 996,
   sm: 768,
   xs: 0,
-};
-
-const GRID_COLS: Record<GridBreakpoint, number> = {
-  lg: 12,
-  md: 10,
-  sm: 6,
-  xs: 4,
-};
-
-const VIEWPORT_PRESETS: Record<
-  BookmarkViewportPreset,
-  Record<GridBreakpoint, Pick<BookmarkGridItem, "w" | "h" | "minW" | "minH">>
-> = {
-  mobile: {
-    lg: { w: 4, h: 11, minW: 4, minH: 8 },
-    md: { w: 4, h: 10, minW: 4, minH: 8 },
-    sm: { w: 3, h: 9, minW: 3, minH: 7 },
-    xs: { w: 2, h: 8, minW: 2, minH: 7 },
-  },
-  tablet: {
-    lg: { w: 6, h: 10, minW: 5, minH: 8 },
-    md: { w: 6, h: 9, minW: 5, minH: 8 },
-    sm: { w: 4, h: 8, minW: 4, minH: 7 },
-    xs: { w: 4, h: 7, minW: 4, minH: 6 },
-  },
-  desktop: {
-    lg: { w: 8, h: 10, minW: 6, minH: 8 },
-    md: { w: 8, h: 9, minW: 6, minH: 8 },
-    sm: { w: 6, h: 8, minW: 6, minH: 7 },
-    xs: { w: 4, h: 7, minW: 4, minH: 6 },
-  },
 };
 
 const creativeOverlapCompactor: typeof verticalCompactor = {
@@ -124,6 +99,11 @@ export function BookmarksGrid({
 
   const bookmarkIdsKey = useMemo(
     () => data.map((item) => item.id).sort().join("|"),
+    [data],
+  );
+
+  const bookmarkById = useMemo(
+    () => new Map(data.map((bookmark) => [bookmark.id, bookmark])),
     [data],
   );
 
@@ -215,6 +195,51 @@ export function BookmarksGrid({
     stateQueryKey,
   ]);
 
+  const normalizeInteractiveLayout = (
+    nextLayout: Layout,
+    nextBreakpoint: GridBreakpoint,
+    nextViewportPresets: BookmarkViewportPresets,
+  ) => {
+    const normalizedLayout = nextLayout.map((item) => {
+      const bookmark = bookmarkById.get(item.i);
+
+      if (!bookmark) {
+        return item;
+      }
+
+      const viewportPreset = getBookmarkViewportPreset(
+        bookmark,
+        nextViewportPresets,
+      );
+
+      return normalizeBookmarkLayoutItem(
+        bookmark,
+        item,
+        nextBreakpoint,
+        viewportPreset,
+      );
+    });
+
+    return mode === "grid"
+      ? activeCompactor.compact(normalizedLayout, GRID_COLS[nextBreakpoint])
+      : normalizedLayout;
+  };
+
+  const persistGridState = (
+    nextLayouts: BookmarkGridLayouts,
+    nextViewportPresets: BookmarkViewportPresets,
+  ) => {
+    queryClient.setQueryData<BookmarkGridState>(stateQueryKey, {
+      layouts: nextLayouts,
+      viewportPresets: nextViewportPresets,
+    });
+
+    void saveStateMutation.mutateAsync({
+      layouts: nextLayouts,
+      viewportPresets: nextViewportPresets,
+    });
+  };
+
   const handleToggleSelected = (bookmarkId: string, checked: boolean) => {
     onRowSelectionChange((prev) => {
       const next = { ...prev };
@@ -233,24 +258,32 @@ export function BookmarksGrid({
     bookmarkId: string,
     preset: BookmarkViewportPreset,
   ) => {
+    const bookmark = bookmarkById.get(bookmarkId);
     const bp = breakpoint as GridBreakpoint;
-    const config = VIEWPORT_PRESETS[preset][bp];
+
+    if (!bookmark || !isWebsiteBookmark(bookmark)) {
+      return;
+    }
+
+    const metrics = resolveBookmarkItemMetrics(bookmark, bp, preset);
 
     const resizedLayout = layout.map((item) => {
       if (item.i !== bookmarkId) {
         return item;
       }
 
-      const nextW = Math.min(config.w, GRID_COLS[bp]);
+      const nextW = Math.min(metrics.w, GRID_COLS[bp]);
       const maxX = Math.max(0, GRID_COLS[bp] - nextW);
 
       return {
         ...item,
         w: nextW,
-        h: config.h,
+        h: metrics.h,
         x: Math.min(item.x, maxX),
-        minW: config.minW,
-        minH: config.minH,
+        minW: metrics.minW,
+        minH: metrics.minH,
+        maxW: metrics.maxW,
+        maxH: metrics.maxH,
       };
     });
 
@@ -259,28 +292,26 @@ export function BookmarksGrid({
         ? activeCompactor.compact(resizedLayout, GRID_COLS[bp])
         : resizedLayout;
 
-    const nextLayouts: BookmarkGridLayouts = {
-      ...layouts,
-      [bp]: nextLayout,
-    };
-
     const nextViewportPresets: BookmarkViewportPresets = {
       ...viewportPresets,
       [bookmarkId]: preset,
     };
 
-    setLayoutForBreakpoint(bp, nextLayout);
+    const normalizedLayout = normalizeInteractiveLayout(
+      nextLayout,
+      bp,
+      nextViewportPresets,
+    );
+
+    const nextLayouts: BookmarkGridLayouts = {
+      ...layouts,
+      [bp]: normalizedLayout,
+    };
+
+    setLayoutForBreakpoint(bp, normalizedLayout);
     setViewportPresets(nextViewportPresets);
 
-    queryClient.setQueryData<BookmarkGridState>(stateQueryKey, {
-      layouts: nextLayouts,
-      viewportPresets: nextViewportPresets,
-    });
-
-    void saveStateMutation.mutateAsync({
-      layouts: nextLayouts,
-      viewportPresets: nextViewportPresets,
-    });
+    persistGridState(nextLayouts, nextViewportPresets);
   };
 
   if (!data.length) {
@@ -315,7 +346,16 @@ export function BookmarksGrid({
         width={width}
         layout={layout}
         onLayoutChange={(nextLayout) => {
-          setLayoutForBreakpoint(breakpoint as GridBreakpoint, nextLayout);
+          const normalizedLayout = normalizeInteractiveLayout(
+            nextLayout,
+            breakpoint as GridBreakpoint,
+            viewportPresets,
+          );
+
+          setLayoutForBreakpoint(
+            breakpoint as GridBreakpoint,
+            normalizedLayout,
+          );
         }}
         gridConfig={{
           cols,
@@ -327,7 +367,7 @@ export function BookmarksGrid({
           enabled: !isBulkDeleting,
           handle: ".bookmark-grid-drag-handle",
           cancel:
-            ".bookmark-grid-no-drag,button,a,input,label,iframe,[data-no-drag='true']",
+            ".bookmark-grid-no-drag,button,a,input,label,iframe,video,[data-no-drag='true']",
           bounded: modeConfig.boundedDrag,
         }}
         resizeConfig={{

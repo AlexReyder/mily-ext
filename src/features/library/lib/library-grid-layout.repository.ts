@@ -11,51 +11,16 @@ import type {
   GridBreakpoint,
   LibraryGridLayoutScope,
 } from "../model/library-grid.types";
+import {
+  getBookmarkViewportPreset,
+  normalizeBookmarkLayoutItem,
+  packDefaultBookmarkLayout,
+  resolveBookmarkItemMetrics,
+} from "./bookmark-layout-metrics";
 
 const GRID_LAYOUT_IDS: Record<LibraryGridLayoutScope, string> = {
   grid: "library-grid-layout",
   creative: "library-creative-layout",
-};
-
-const GRID_COLS: Record<GridBreakpoint, number> = {
-  lg: 12,
-  md: 10,
-  sm: 6,
-  xs: 4,
-};
-
-const DEFAULT_SIZES: Record<
-  GridBreakpoint,
-  Pick<BookmarkGridItem, "w" | "h" | "minW" | "minH" | "maxW" | "maxH">
-> = {
-  lg: { w: 6, h: 9, minW: 4, minH: 8, maxW: 12, maxH: 18 },
-  md: { w: 5, h: 9, minW: 4, minH: 8, maxW: 10, maxH: 18 },
-  sm: { w: 3, h: 8, minW: 3, minH: 7, maxW: 6, maxH: 16 },
-  xs: { w: 4, h: 7, minW: 2, minH: 6, maxW: 4, maxH: 14 },
-};
-
-const VIEWPORT_PRESET_SIZES: Record<
-  BookmarkViewportPreset,
-  Record<GridBreakpoint, Pick<BookmarkGridItem, "w" | "h" | "minW" | "minH">>
-> = {
-  mobile: {
-    lg: { w: 4, h: 11, minW: 4, minH: 8 },
-    md: { w: 4, h: 10, minW: 4, minH: 8 },
-    sm: { w: 3, h: 9, minW: 3, minH: 7 },
-    xs: { w: 2, h: 8, minW: 2, minH: 7 },
-  },
-  tablet: {
-    lg: { w: 6, h: 10, minW: 5, minH: 8 },
-    md: { w: 6, h: 9, minW: 5, minH: 8 },
-    sm: { w: 4, h: 8, minW: 4, minH: 7 },
-    xs: { w: 4, h: 7, minW: 4, minH: 6 },
-  },
-  desktop: {
-    lg: { w: 8, h: 10, minW: 6, minH: 8 },
-    md: { w: 8, h: 9, minW: 6, minH: 8 },
-    sm: { w: 6, h: 8, minW: 6, minH: 7 },
-    xs: { w: 4, h: 7, minW: 4, minH: 6 },
-  },
 };
 
 const VIEWPORT_PRESET_VALUES: BookmarkViewportPreset[] = [
@@ -75,24 +40,6 @@ function isValidViewportPreset(value: unknown): value is BookmarkViewportPreset 
   );
 }
 
-function createDefaultItem(
-  id: string,
-  index: number,
-  breakpoint: GridBreakpoint,
-  position?: Partial<Pick<BookmarkGridItem, "x" | "y">>,
-): BookmarkGridItem {
-  const preset = DEFAULT_SIZES[breakpoint];
-  const cols = GRID_COLS[breakpoint];
-  const itemsPerRow = Math.max(1, Math.floor(cols / preset.w));
-
-  return {
-    i: id,
-    x: position?.x ?? (index % itemsPerRow) * preset.w,
-    y: position?.y ?? Math.floor(index / itemsPerRow) * preset.h,
-    ...preset,
-  };
-}
-
 function getLayoutBottom(items: Layout | undefined) {
   return (items ?? []).reduce((max, item) => {
     return Math.max(max, item.y + item.h);
@@ -100,20 +47,31 @@ function getLayoutBottom(items: Layout | undefined) {
 }
 
 function createAppendedItem(
-  id: string,
+  bookmark: BookmarkRecord,
   breakpoint: GridBreakpoint,
   nextY: number,
+  viewportPresets: BookmarkViewportPresets,
 ): BookmarkGridItem {
-  return createDefaultItem(id, 0, breakpoint, {
+  const viewportPreset = getBookmarkViewportPreset(bookmark, viewportPresets);
+  const metrics = resolveBookmarkItemMetrics(
+    bookmark,
+    breakpoint,
+    viewportPreset,
+  );
+
+  return {
+    i: bookmark.id,
     x: 0,
     y: nextY,
-  });
+    ...metrics,
+  };
 }
 
 function normalizeLayoutForBreakpoint(
   storedItems: Layout | undefined,
   bookmarks: BookmarkRecord[],
   breakpoint: GridBreakpoint,
+  viewportPresets: BookmarkViewportPresets,
 ): Layout {
   const bookmarkIds = new Set(bookmarks.map((bookmark) => bookmark.id));
 
@@ -121,13 +79,11 @@ function normalizeLayoutForBreakpoint(
     bookmarkIds.has(item.i),
   );
 
-  const storedById = new Map(filteredStoredItems.map((item) => [item.i, item]));
-
   if (!filteredStoredItems.length) {
-    return bookmarks.map((bookmark, index) =>
-      createDefaultItem(bookmark.id, index, breakpoint),
-    );
+    return packDefaultBookmarkLayout(bookmarks, breakpoint, viewportPresets);
   }
+
+  const storedById = new Map(filteredStoredItems.map((item) => [item.i, item]));
 
   let nextY = getLayoutBottom(filteredStoredItems);
   const appendedById = new Map<string, BookmarkGridItem>();
@@ -137,14 +93,30 @@ function normalizeLayoutForBreakpoint(
       continue;
     }
 
-    const appendedItem = createAppendedItem(bookmark.id, breakpoint, nextY);
+    const appendedItem = createAppendedItem(
+      bookmark,
+      breakpoint,
+      nextY,
+      viewportPresets,
+    );
 
     appendedById.set(bookmark.id, appendedItem);
     nextY += appendedItem.h;
   }
 
   return bookmarks.map((bookmark) => {
-    return storedById.get(bookmark.id) ?? appendedById.get(bookmark.id)!;
+    const storedItem = storedById.get(bookmark.id);
+
+    if (storedItem) {
+      return normalizeBookmarkLayoutItem(
+        bookmark,
+        storedItem,
+        breakpoint,
+        getBookmarkViewportPreset(bookmark, viewportPresets),
+      );
+    }
+
+    return appendedById.get(bookmark.id)!;
   });
 }
 
@@ -157,9 +129,23 @@ function inferViewportPresetFromItem(
   }
 
   for (const preset of VIEWPORT_PRESET_VALUES) {
-    const config = VIEWPORT_PRESET_SIZES[preset][breakpoint];
+    const metrics = resolveBookmarkItemMetrics(
+      {
+        id: item.i,
+        kind: "website",
+        title: "",
+        note: "",
+        collectionId: "",
+        tags: [],
+        createdAt: "",
+        updatedAt: "",
+        content: { url: "" },
+      },
+      breakpoint,
+      preset,
+    );
 
-    if (item.w === config.w && item.h === config.h) {
+    if (item.w === metrics.w && item.h === metrics.h) {
       return preset;
     }
   }
@@ -192,6 +178,10 @@ function normalizeViewportPresets(
   const nextViewportPresets: BookmarkViewportPresets = {};
 
   for (const bookmark of bookmarks) {
+    if (bookmark.kind !== "website") {
+      continue;
+    }
+
     const storedPreset = storedViewportPresets?.[bookmark.id];
 
     nextViewportPresets[bookmark.id] = isValidViewportPreset(storedPreset)
@@ -223,34 +213,40 @@ export async function getLibraryGridState(
 ): Promise<BookmarkGridState> {
   const record = await db.libraryGridLayouts.get(getLayoutId(scope));
   const legacyItems = (record as { items?: Layout } | undefined)?.items;
+  const rawLayouts = record?.layouts;
+  const rawViewportPresets = record?.viewportPresets ?? {};
 
   const layouts: BookmarkGridLayouts = {
     lg: normalizeLayoutForBreakpoint(
-      record?.layouts?.lg ?? legacyItems,
+      rawLayouts?.lg ?? legacyItems,
       bookmarks,
       "lg",
+      rawViewportPresets,
     ),
     md: normalizeLayoutForBreakpoint(
-      record?.layouts?.md ?? legacyItems,
+      rawLayouts?.md ?? legacyItems,
       bookmarks,
       "md",
+      rawViewportPresets,
     ),
     sm: normalizeLayoutForBreakpoint(
-      record?.layouts?.sm ?? legacyItems,
+      rawLayouts?.sm ?? legacyItems,
       bookmarks,
       "sm",
+      rawViewportPresets,
     ),
     xs: normalizeLayoutForBreakpoint(
-      record?.layouts?.xs ?? legacyItems,
+      rawLayouts?.xs ?? legacyItems,
       bookmarks,
       "xs",
+      rawViewportPresets,
     ),
   };
 
   return {
     layouts,
     viewportPresets: normalizeViewportPresets(
-      record?.viewportPresets,
+      rawViewportPresets,
       bookmarks,
       layouts,
     ),
