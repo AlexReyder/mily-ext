@@ -121,3 +121,8 @@ Argument of type 'Layout | undefined' is not assignable to parameter of type 'La
 2) Кликает на изображение ПКМ и в контекстном меню выбирает сохранить изображение в Mily. 
 3) Затем изображение добавляется в Library.
 Также я хочу переорганизовать структуру таким образом, чтобы в будущем нам было легко добавлять новые типы Bookmark. Например, Видео. Также учти, что затем в Library мы будем выводить изображения в Grid / Fullscreen / Creative Views.
+
+Так, давай дальше сделаем:
+1) Нормальный thumbnail/preview pipeline для изображений, чтобы не хранить тяжёлый data URL в полном размере.
+2) Открытие локального original asset в Fullscreen вместо previewUrl
+3) Отдельный flow для видео.

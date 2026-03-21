@@ -67,7 +67,7 @@ export function EditBookmarkSheet({
     }
 
     const exists = tags.some(
-      (tag) => tag.toLowerCase() == nextTag.toLowerCase(),
+      (tag) => tag.toLowerCase() === nextTag.toLowerCase(),
     );
 
     if (exists) {
@@ -153,7 +153,7 @@ export function EditBookmarkSheet({
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key == "Enter") {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         handleAddTag();
                       }

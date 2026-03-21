@@ -9,7 +9,8 @@ export default defineConfig({
   modulesDir: "wxt-modules",
   outDir: "dist",
   manifest: {
-    permissions: ["tabs"],
+    permissions: ["tabs", "contextMenus"],
+    host_permissions: ["*://*/*"],
   },
   vite: () => ({
     plugins: [

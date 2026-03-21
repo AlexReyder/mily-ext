@@ -34,6 +34,7 @@ export function BookmarksFullscreen({ data }: BookmarksFullscreenProps) {
                 title={bookmark.title}
                 loading="lazy"
                 interactive
+                variant="fullscreen"
                 className="absolute inset-0 h-full w-full"
               />
 

@@ -17,8 +17,8 @@ import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
 import {
   getBookmarkOpenUrl,
   getBookmarkSecondaryText,
-  getBookmarkThumbnailUrl,
 } from "@/features/bookmark/model/bookmark.types";
+import { BookmarkThumbnailImage } from "@/features/bookmark/ui/bookmark-thumbnail-image";
 
 type BookmarksTableProps = {
   data: BookmarkRecord[];
@@ -92,19 +92,13 @@ export function BookmarksTable({
         ),
         cell: ({ row }) => {
           const item = row.original;
-          const thumbnailUrl = getBookmarkThumbnailUrl(item);
 
           return (
             <div className="flex min-w-0 items-center gap-3">
-              {thumbnailUrl ? (
-                <img
-                  src={thumbnailUrl}
-                  alt=""
-                  className="size-4 shrink-0 rounded-sm object-cover"
-                />
-              ) : (
-                <div className="size-4 shrink-0 rounded-sm bg-border" />
-              )}
+              <BookmarkThumbnailImage
+                bookmark={item}
+                className="size-4 shrink-0 rounded-sm object-cover"
+              />
 
               <div className="min-w-0">
                 <div className="truncate font-medium">{item.title}</div>

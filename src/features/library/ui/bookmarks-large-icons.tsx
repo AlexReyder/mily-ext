@@ -2,10 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import type { RowSelectionState } from "@tanstack/react-table";
 
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
-import {
-  getBookmarkOpenUrl,
-  getBookmarkThumbnailUrl,
-} from "@/features/bookmark/model/bookmark.types";
+import { getBookmarkOpenUrl } from "@/features/bookmark/model/bookmark.types";
+import { BookmarkThumbnailImage } from "@/features/bookmark/ui/bookmark-thumbnail-image";
 import { cn } from "@/lib/utils";
 
 type BookmarksLargeIconsProps = {
@@ -65,7 +63,6 @@ export function BookmarksLargeIcons({
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
       {data.map((bookmark) => {
         const selected = Boolean(rowSelection[bookmark.id]);
-        const thumbnailUrl = getBookmarkThumbnailUrl(bookmark);
 
         return (
           <div
@@ -88,18 +85,15 @@ export function BookmarksLargeIcons({
             </label>
 
             <div className="flex items-center justify-center rounded-2xl border bg-muted/40 px-6 py-10">
-              {thumbnailUrl ? (
-                <img
-                  src={thumbnailUrl}
-                  alt=""
-                  className="size-20 rounded-2xl object-contain"
-                  loading="lazy"
-                />
-              ) : (
+              <BookmarkThumbnailImage
+                bookmark={bookmark}
+                className="size-20 rounded-2xl object-contain"
+              />
+              {!getBookmarkOpenUrl(bookmark) && !bookmark.title ? (
                 <div className="flex size-20 items-center justify-center rounded-2xl border bg-background text-2xl font-semibold text-foreground/80">
                   {getFallbackLetter(bookmark)}
                 </div>
-              )}
+              ) : null}
             </div>
 
             <div className="mt-4 min-w-0">

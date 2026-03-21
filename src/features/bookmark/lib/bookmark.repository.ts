@@ -1,8 +1,11 @@
+import { deleteAssetsByIds } from "@/features/asset/lib/asset.repository";
 import { db } from "@/lib/db";
 import type {
   BookmarkRecord,
   BookmarkSourceMeta,
   CreateBookmarkInput,
+  CreateImageBookmarkInput,
+  CreateVideoBookmarkInput,
   ImageBookmarkRecord,
   LegacyWebsiteBookmarkRecord,
   UpdateBookmarkInput,
@@ -78,6 +81,9 @@ function normalizeImageBookmarkRecord(
     source: normalizeSource(record.source),
     content: {
       ...record.content,
+      assetId: record.content.assetId?.trim() || undefined,
+      previewAssetId: record.content.previewAssetId?.trim() || undefined,
+      thumbnailAssetId: record.content.thumbnailAssetId?.trim() || undefined,
       originalUrl: record.content.originalUrl?.trim() || undefined,
       previewUrl: record.content.previewUrl?.trim() || undefined,
       thumbnailUrl: record.content.thumbnailUrl?.trim() || undefined,
@@ -100,9 +106,12 @@ function normalizeVideoBookmarkRecord(
     source: normalizeSource(record.source),
     content: {
       ...record.content,
+      assetId: record.content.assetId?.trim() || undefined,
+      posterAssetId: record.content.posterAssetId?.trim() || undefined,
       originalUrl: record.content.originalUrl?.trim() || undefined,
       posterUrl: record.content.posterUrl?.trim() || undefined,
       mimeType: record.content.mimeType?.trim() || undefined,
+      filename: record.content.filename?.trim() || undefined,
     },
   };
 }
@@ -128,15 +137,17 @@ export function normalizeStoredBookmarkRecord(
   return normalizeLegacyWebsiteRecord(record);
 }
 
+async function getStoredBookmarks() {
+  return ((await db.bookmarks.toArray()) as unknown as StoredBookmarkRecord[]) ?? [];
+}
+
 export async function saveBookmark(
   input: CreateBookmarkInput,
 ): Promise<WebsiteBookmarkRecord> {
   const normalizedUrl = input.url.trim();
   const now = new Date().toISOString();
 
-  const existing = (
-    (await db.bookmarks.toArray()) as unknown as StoredBookmarkRecord[]
-  )
+  const existing = (await getStoredBookmarks())
     .map(normalizeStoredBookmarkRecord)
     .find(
       (bookmark): bookmark is WebsiteBookmarkRecord =>
@@ -154,6 +165,120 @@ export async function saveBookmark(
     content: {
       url: normalizedUrl,
       faviconUrl: input.faviconUrl.trim() || undefined,
+    },
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  await db.bookmarks.put(record as BookmarkRecord);
+
+  return record;
+}
+
+export async function saveImageBookmark(
+  input: CreateImageBookmarkInput,
+): Promise<ImageBookmarkRecord> {
+  const normalizedOriginalUrl = input.originalUrl?.trim() || undefined;
+  const normalizedAssetId = input.assetId?.trim() || undefined;
+  const now = new Date().toISOString();
+
+  const existing = (await getStoredBookmarks())
+    .map(normalizeStoredBookmarkRecord)
+    .find((bookmark): bookmark is ImageBookmarkRecord => {
+      if (bookmark.kind !== "image") {
+        return false;
+      }
+
+      if (
+        normalizedOriginalUrl &&
+        bookmark.content.originalUrl === normalizedOriginalUrl
+      ) {
+        return true;
+      }
+
+      if (normalizedAssetId && bookmark.content.assetId === normalizedAssetId) {
+        return true;
+      }
+
+      return false;
+    });
+
+  const record: ImageBookmarkRecord = {
+    id: existing?.id ?? crypto.randomUUID(),
+    kind: "image",
+    title: input.title.trim(),
+    note: input.note.trim(),
+    collectionId: input.collectionId.trim(),
+    tags: normalizeTags(input.tags),
+    source: normalizeSource(input.source),
+    content: {
+      assetId: normalizedAssetId,
+      previewAssetId: input.previewAssetId?.trim() || undefined,
+      thumbnailAssetId: input.thumbnailAssetId?.trim() || undefined,
+      originalUrl: normalizedOriginalUrl,
+      previewUrl: input.previewUrl?.trim() || undefined,
+      thumbnailUrl: input.thumbnailUrl?.trim() || undefined,
+      mimeType: input.mimeType.trim(),
+      width: input.width,
+      height: input.height,
+      alt: input.alt?.trim() || undefined,
+      filename: input.filename?.trim() || undefined,
+    },
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  await db.bookmarks.put(record as BookmarkRecord);
+
+  return record;
+}
+
+export async function saveVideoBookmark(
+  input: CreateVideoBookmarkInput,
+): Promise<VideoBookmarkRecord> {
+  const normalizedOriginalUrl = input.originalUrl?.trim() || undefined;
+  const normalizedAssetId = input.assetId?.trim() || undefined;
+  const now = new Date().toISOString();
+
+  const existing = (await getStoredBookmarks())
+    .map(normalizeStoredBookmarkRecord)
+    .find((bookmark): bookmark is VideoBookmarkRecord => {
+      if (bookmark.kind !== "video") {
+        return false;
+      }
+
+      if (
+        normalizedOriginalUrl &&
+        bookmark.content.originalUrl === normalizedOriginalUrl
+      ) {
+        return true;
+      }
+
+      if (normalizedAssetId && bookmark.content.assetId === normalizedAssetId) {
+        return true;
+      }
+
+      return false;
+    });
+
+  const record: VideoBookmarkRecord = {
+    id: existing?.id ?? crypto.randomUUID(),
+    kind: "video",
+    title: input.title.trim(),
+    note: input.note.trim(),
+    collectionId: input.collectionId.trim(),
+    tags: normalizeTags(input.tags),
+    source: normalizeSource(input.source),
+    content: {
+      assetId: normalizedAssetId,
+      posterAssetId: input.posterAssetId?.trim() || undefined,
+      originalUrl: normalizedOriginalUrl,
+      posterUrl: input.posterUrl?.trim() || undefined,
+      mimeType: input.mimeType?.trim() || undefined,
+      width: input.width,
+      height: input.height,
+      durationSec: input.durationSec,
+      filename: input.filename?.trim() || undefined,
     },
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
@@ -210,7 +335,40 @@ export async function deleteBookmarksByIds(ids: string[]) {
     return 0;
   }
 
+  const storedRecords = ((await db.bookmarks.bulkGet(uniqueIds)) as unknown as (
+    | StoredBookmarkRecord
+    | undefined
+  )[]) ?? [];
+
+  const assetIds = storedRecords.flatMap((record) => {
+    if (!record) {
+      return [];
+    }
+
+    const bookmark = normalizeStoredBookmarkRecord(record);
+
+    if (bookmark.kind === "image") {
+      return [
+        bookmark.content.assetId,
+        bookmark.content.previewAssetId,
+        bookmark.content.thumbnailAssetId,
+      ].filter(Boolean) as string[];
+    }
+
+    if (bookmark.kind === "video") {
+      return [bookmark.content.assetId, bookmark.content.posterAssetId].filter(
+        Boolean,
+      ) as string[];
+    }
+
+    return [];
+  });
+
   await db.bookmarks.bulkDelete(uniqueIds);
+
+  if (assetIds.length) {
+    await deleteAssetsByIds(assetIds);
+  }
 
   return uniqueIds.length;
 }

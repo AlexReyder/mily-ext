@@ -5,6 +5,7 @@ import {
   getBookmarkThumbnailUrl,
   isImageBookmark,
 } from "@/features/bookmark/model/bookmark.types";
+import { useAssetObjectUrl } from "@/features/asset/lib/use-asset-object-url";
 import { cn } from "@/lib/utils";
 
 type BookmarkMediaSurfaceProps = {
@@ -14,6 +15,7 @@ type BookmarkMediaSurfaceProps = {
   loading?: "lazy" | "eager";
   interactive?: boolean;
   onLoad?: () => void;
+  variant?: "card" | "fullscreen";
 };
 
 function MediaUnavailable({ label }: { label: string }) {
@@ -24,6 +26,32 @@ function MediaUnavailable({ label }: { label: string }) {
   );
 }
 
+function resolveMediaAssetId(
+  bookmark: BookmarkRecord,
+  variant: "card" | "fullscreen",
+) {
+  switch (bookmark.kind) {
+    case "website":
+      return undefined;
+
+    case "image":
+      return variant === "fullscreen"
+        ? bookmark.content.assetId ??
+            bookmark.content.previewAssetId ??
+            bookmark.content.thumbnailAssetId
+        : bookmark.content.previewAssetId ??
+            bookmark.content.thumbnailAssetId ??
+            bookmark.content.assetId;
+
+    case "video":
+      return bookmark.content.assetId;
+  }
+}
+
+function resolvePosterAssetId(bookmark: BookmarkRecord) {
+  return bookmark.kind === "video" ? bookmark.content.posterAssetId : undefined;
+}
+
 export function BookmarkMediaSurface({
   bookmark,
   className,
@@ -31,10 +59,19 @@ export function BookmarkMediaSurface({
   loading = "lazy",
   interactive = false,
   onLoad,
+  variant = "card",
 }: BookmarkMediaSurfaceProps) {
-  const mediaUrl = getBookmarkMediaUrl(bookmark);
+  const mediaAssetId = resolveMediaAssetId(bookmark, variant);
+  const posterAssetId = resolvePosterAssetId(bookmark);
+  const { objectUrl: mediaObjectUrl } = useAssetObjectUrl(mediaAssetId);
+  const { objectUrl: posterObjectUrl } = useAssetObjectUrl(posterAssetId);
 
-  if (!mediaUrl) {
+  const fallbackMediaUrl = getBookmarkMediaUrl(bookmark);
+  const fallbackPosterUrl = getBookmarkThumbnailUrl(bookmark);
+  const mediaUrl = mediaObjectUrl ?? fallbackMediaUrl;
+  const posterUrl = posterObjectUrl ?? fallbackPosterUrl;
+
+  if (!mediaUrl && bookmark.kind !== "video") {
     return (
       <MediaUnavailable
         label={`${getBookmarkKindLabel(bookmark)} preview unavailable`}
@@ -46,7 +83,7 @@ export function BookmarkMediaSurface({
     case "website":
       return (
         <iframe
-          src={mediaUrl}
+          src={mediaUrl!}
           title={title ?? bookmark.title}
           loading={loading}
           onLoad={() => onLoad?.()}
@@ -57,7 +94,7 @@ export function BookmarkMediaSurface({
     case "image":
       return (
         <img
-          src={mediaUrl}
+          src={mediaUrl!}
           alt={
             isImageBookmark(bookmark)
               ? bookmark.content.alt ?? bookmark.title
@@ -70,13 +107,21 @@ export function BookmarkMediaSurface({
       );
 
     case "video":
+      if (!mediaUrl) {
+        return (
+          <MediaUnavailable
+            label={`${getBookmarkKindLabel(bookmark)} preview unavailable`}
+          />
+        );
+      }
+
       return (
         <video
           src={mediaUrl}
-          poster={getBookmarkThumbnailUrl(bookmark) ?? undefined}
-          preload="metadata"
+          poster={posterUrl ?? undefined}
+          preload={interactive ? "metadata" : "none"}
           playsInline
-          muted
+          muted={!interactive}
           controls={interactive}
           onLoadedData={() => onLoad?.()}
           className={cn("object-contain bg-black", className)}

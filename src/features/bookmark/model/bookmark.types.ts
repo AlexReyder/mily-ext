@@ -32,6 +32,8 @@ export type ImageBookmarkRecord = BookmarkBase & {
   kind: "image";
   content: {
     assetId?: string;
+    previewAssetId?: string;
+    thumbnailAssetId?: string;
     originalUrl?: string;
     previewUrl?: string;
     thumbnailUrl?: string;
@@ -47,12 +49,14 @@ export type VideoBookmarkRecord = BookmarkBase & {
   kind: "video";
   content: {
     assetId?: string;
+    posterAssetId?: string;
     originalUrl?: string;
     posterUrl?: string;
     mimeType?: string;
     width: number;
     height: number;
     durationSec?: number;
+    filename?: string;
   };
 };
 
@@ -81,6 +85,42 @@ export type CreateWebsiteBookmarkInput = {
   tags: string[];
   faviconUrl: string;
   source?: BookmarkSourceMeta;
+};
+
+export type CreateImageBookmarkInput = {
+  title: string;
+  note: string;
+  collectionId: string;
+  tags: string[];
+  source?: BookmarkSourceMeta;
+  assetId?: string;
+  previewAssetId?: string;
+  thumbnailAssetId?: string;
+  originalUrl?: string;
+  previewUrl?: string;
+  thumbnailUrl?: string;
+  mimeType: string;
+  width: number;
+  height: number;
+  alt?: string;
+  filename?: string;
+};
+
+export type CreateVideoBookmarkInput = {
+  title: string;
+  note: string;
+  collectionId: string;
+  tags: string[];
+  source?: BookmarkSourceMeta;
+  assetId?: string;
+  posterAssetId?: string;
+  originalUrl?: string;
+  posterUrl?: string;
+  mimeType?: string;
+  width: number;
+  height: number;
+  durationSec?: number;
+  filename?: string;
 };
 
 export type CreateBookmarkInput = CreateWebsiteBookmarkInput;
@@ -250,6 +290,7 @@ export function getBookmarkSearchValues(bookmark: BookmarkRecord) {
         bookmark.content.originalUrl ?? "",
         bookmark.content.posterUrl ?? "",
         bookmark.content.mimeType ?? "",
+        bookmark.content.filename ?? "",
       ];
   }
 }
