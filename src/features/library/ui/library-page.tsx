@@ -12,6 +12,7 @@ import type {
   BookmarkRecord,
   UpdateBookmarkInput,
 } from "@/features/bookmark/model/bookmark.types";
+import { getBookmarkSearchValues } from "@/features/bookmark/model/bookmark.types";
 import { useLibraryViewStore } from "../model/library-view.store";
 import { BookmarksTable } from "./bookmarks-table";
 import { LibraryToolbar } from "./library-toolbar";
@@ -43,12 +44,8 @@ export function LibraryPage() {
     if (!q) return items;
 
     return items.filter((item) => {
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.url.toLowerCase().includes(q) ||
-        item.note.toLowerCase().includes(q) ||
-        item.collectionId.toLowerCase().includes(q) ||
-        item.tags.some((tag) => tag.toLowerCase().includes(q))
+      return getBookmarkSearchValues(item).some((value) =>
+        value.toLowerCase().includes(q),
       );
     });
   }, [bookmarksQuery.data, search]);

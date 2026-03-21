@@ -14,6 +14,11 @@ import { ArrowUpDown, ExternalLink, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
+import {
+  getBookmarkOpenUrl,
+  getBookmarkSecondaryText,
+  getBookmarkThumbnailUrl,
+} from "@/features/bookmark/model/bookmark.types";
 
 type BookmarksTableProps = {
   data: BookmarkRecord[];
@@ -24,14 +29,6 @@ type BookmarksTableProps = {
 };
 
 const columnHelper = createColumnHelper<BookmarkRecord>();
-
-function getDomain(url: string) {
-  try {
-    return new URL(url).hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
 
 export function BookmarksTable({
   data,
@@ -95,14 +92,15 @@ export function BookmarksTable({
         ),
         cell: ({ row }) => {
           const item = row.original;
+          const thumbnailUrl = getBookmarkThumbnailUrl(item);
 
           return (
             <div className="flex min-w-0 items-center gap-3">
-              {item.faviconUrl ? (
+              {thumbnailUrl ? (
                 <img
-                  src={item.faviconUrl}
+                  src={thumbnailUrl}
                   alt=""
-                  className="size-4 shrink-0 rounded-sm"
+                  className="size-4 shrink-0 rounded-sm object-cover"
                 />
               ) : (
                 <div className="size-4 shrink-0 rounded-sm bg-border" />
@@ -111,7 +109,7 @@ export function BookmarksTable({
               <div className="min-w-0">
                 <div className="truncate font-medium">{item.title}</div>
                 <div className="truncate text-xs text-muted-foreground">
-                  {getDomain(item.url)}
+                  {getBookmarkSecondaryText(item)}
                 </div>
               </div>
             </div>
@@ -176,29 +174,37 @@ export function BookmarksTable({
       columnHelper.display({
         id: "actions",
         header: "",
-        cell: ({ row }) => (
-          <div className="flex items-center justify-end gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="h-8 px-3"
-              onClick={() => onEdit(row.original)}
-            >
-              <Pencil className="mr-2 size-4" />
-              Edit
-            </Button>
+        cell: ({ row }) => {
+          const openUrl = getBookmarkOpenUrl(row.original);
 
-            <a
-              href={row.original.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              Open
-              <ExternalLink className="size-4" />
-            </a>
-          </div>
-        ),
+          return (
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-8 px-3"
+                onClick={() => onEdit(row.original)}
+              >
+                <Pencil className="mr-2 size-4" />
+                Edit
+              </Button>
+
+              {openUrl ? (
+                <a
+                  href={openUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-muted-foreground transition hover:text-foreground"
+                >
+                  Open
+                  <ExternalLink className="size-4" />
+                </a>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+            </div>
+          );
+        },
       }),
     ],
     [isBulkDeleting, onEdit],

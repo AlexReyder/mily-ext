@@ -14,6 +14,7 @@ import type {
   BookmarkRecord,
   UpdateBookmarkInput,
 } from "@/features/bookmark/model/bookmark.types";
+import { getBookmarkOpenUrl } from "@/features/bookmark/model/bookmark.types";
 
 type EditBookmarkSheetProps = {
   open: boolean;
@@ -66,7 +67,7 @@ export function EditBookmarkSheet({
     }
 
     const exists = tags.some(
-      (tag) => tag.toLowerCase() === nextTag.toLowerCase(),
+      (tag) => tag.toLowerCase() == nextTag.toLowerCase(),
     );
 
     if (exists) {
@@ -101,6 +102,8 @@ export function EditBookmarkSheet({
     });
   };
 
+  const openUrl = bookmark ? getBookmarkOpenUrl(bookmark) : null;
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-xl">
@@ -115,9 +118,9 @@ export function EditBookmarkSheet({
 
             <div className="flex-1 space-y-6 py-6">
               <div className="space-y-2">
-                <div className="text-sm font-medium">URL</div>
+                <div className="text-sm font-medium">URL / source</div>
                 <div className="rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground break-all">
-                  {bookmark.url}
+                  {openUrl ?? "—"}
                 </div>
               </div>
 
@@ -150,7 +153,7 @@ export function EditBookmarkSheet({
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter") {
+                      if (e.key == "Enter") {
                         e.preventDefault();
                         handleAddTag();
                       }

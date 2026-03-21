@@ -2,8 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { ExternalLink, Monitor, Smartphone, Tablet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import type { BookmarkRecord } from "@/features/bookmark/model/bookmark.types";
+import {
+  getBookmarkOpenUrl,
+  isWebsiteBookmark,
+} from "@/features/bookmark/model/bookmark.types";
+import { BookmarkMediaSurface } from "@/features/bookmark/ui/bookmark-media-surface";
+import { cn } from "@/lib/utils";
 import type { BookmarkViewportPreset } from "../model/library-grid.types";
 
 type PreviewState = "idle" | "loading" | "ready" | "timeout";
@@ -47,16 +52,18 @@ export function BookmarkLiveCard({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const timeoutRef = useRef<number | null>(null);
 
-  const [shouldMountFrame, setShouldMountFrame] = useState(false);
+  const [shouldMountMedia, setShouldMountMedia] = useState(false);
   const [previewState, setPreviewState] = useState<PreviewState>("idle");
   const [isPointerInside, setIsPointerInside] = useState(false);
 
   const isInteractive = previewState === "ready" && isPointerInside;
+  const isWebsite = isWebsiteBookmark(bookmark);
+  const openUrl = getBookmarkOpenUrl(bookmark);
 
   useEffect(() => {
     const node = rootRef.current;
 
-    if (!node || shouldMountFrame) {
+    if (!node || shouldMountMedia) {
       return;
     }
 
@@ -65,7 +72,7 @@ export function BookmarkLiveCard({
         const entry = entries[0];
 
         if (entry?.isIntersecting) {
-          setShouldMountFrame(true);
+          setShouldMountMedia(true);
           observer.disconnect();
         }
       },
@@ -78,10 +85,10 @@ export function BookmarkLiveCard({
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [shouldMountFrame]);
+  }, [shouldMountMedia]);
 
   useEffect(() => {
-    if (!shouldMountFrame) {
+    if (!shouldMountMedia) {
       return;
     }
 
@@ -104,9 +111,9 @@ export function BookmarkLiveCard({
         timeoutRef.current = null;
       }
     };
-  }, [shouldMountFrame, viewportMode]);
+  }, [shouldMountMedia, viewportMode]);
 
-  const handleFrameLoad = () => {
+  const handleMediaLoad = () => {
     if (timeoutRef.current !== null) {
       window.clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -124,6 +131,10 @@ export function BookmarkLiveCard({
   };
 
   const handleViewportChange = (preset: BookmarkViewportPreset) => {
+    if (!isWebsite) {
+      return;
+    }
+
     onViewportPresetChange(bookmark.id, preset);
   };
 
@@ -151,37 +162,41 @@ export function BookmarkLiveCard({
               />
             </label>
 
-            <div className="bookmark-grid-no-drag inline-flex items-center rounded-lg border bg-background/90 p-1 shadow-sm">
-              {(Object.keys(VIEWPORTS) as BookmarkViewportPreset[]).map((mode) => {
-                const config = VIEWPORTS[mode];
-                const Icon = config.Icon;
-                const active = viewportMode === mode;
+            {isWebsite ? (
+              <div className="bookmark-grid-no-drag inline-flex items-center rounded-lg border bg-background/90 p-1 shadow-sm">
+                {(Object.keys(VIEWPORTS) as BookmarkViewportPreset[]).map(
+                  (mode) => {
+                    const config = VIEWPORTS[mode];
+                    const Icon = config.Icon;
+                    const active = viewportMode === mode;
 
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    aria-label={`${config.label} view`}
-                    aria-pressed={active}
-                    title={config.label}
-                    onClick={() => handleViewportChange(mode)}
-                    className={cn(
-                      "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition",
-                      active
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    <span className="hidden sm:inline">{config.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-label={`${config.label} view`}
+                        aria-pressed={active}
+                        title={config.label}
+                        onClick={() => handleViewportChange(mode)}
+                        className={cn(
+                          "inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-medium transition",
+                          active
+                            ? "bg-foreground text-background"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        <span className="hidden sm:inline">{config.label}</span>
+                      </button>
+                    );
+                  },
+                )}
+              </div>
+            ) : null}
           </div>
 
           <div className="text-xs text-muted-foreground">
-            {isInteractive ? "Interactive" : "Preview"}
+            {isWebsite ? (isInteractive ? "Interactive" : "Preview") : "Preview"}
           </div>
         </div>
       </div>
@@ -191,15 +206,16 @@ export function BookmarkLiveCard({
         onPointerLeave={handlePointerLeave}
         className="relative min-h-0 flex-1 overflow-hidden bg-muted"
       >
-        {shouldMountFrame ? (
-          <iframe
-            key={`${bookmark.id}-${viewportMode}`}
-            src={bookmark.url}
+        {shouldMountMedia ? (
+          <BookmarkMediaSurface
+            key={`${bookmark.id}-${bookmark.kind}-${isWebsite ? viewportMode : "default"}`}
+            bookmark={bookmark}
             title={bookmark.title}
             loading="lazy"
-            onLoad={handleFrameLoad}
+            interactive={isInteractive}
+            onLoad={handleMediaLoad}
             className={cn(
-              "absolute inset-0 h-full w-full border-0 bg-white transition-opacity duration-300",
+              "absolute inset-0 h-full w-full transition-opacity duration-300",
               previewState === "ready" ? "opacity-100" : "opacity-0",
               isInteractive ? "pointer-events-auto" : "pointer-events-none",
             )}
@@ -212,8 +228,10 @@ export function BookmarkLiveCard({
               <div className="text-sm font-medium">{bookmark.title}</div>
               <div className="text-xs text-muted-foreground">
                 {previewState === "timeout"
-                  ? "Сайт не дал показать live preview или отвечает слишком долго."
-                  : "Подготавливаем live preview."}
+                  ? isWebsite
+                    ? "Сайт не дал показать live preview или отвечает слишком долго."
+                    : "Контент не загрузился или отвечает слишком долго."
+                  : "Подготавливаем preview."}
               </div>
             </div>
           </div>
@@ -244,22 +262,24 @@ export function BookmarkLiveCard({
             ) : null}
           </div>
 
-          <Button
-            asChild
-            variant="outline"
-            size="icon"
-            className="bookmark-grid-no-drag shrink-0"
-          >
-            <a
-              href={bookmark.url}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={`Open ${bookmark.title}`}
-              title="Open site"
+          {openUrl ? (
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="bookmark-grid-no-drag shrink-0"
             >
-              <ExternalLink className="size-4" />
-            </a>
-          </Button>
+              <a
+                href={openUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={`Open ${bookmark.title}`}
+                title="Open bookmark"
+              >
+                <ExternalLink className="size-4" />
+              </a>
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>
